@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-09-13 14:35:22
+LastEditTime: 2022-09-22 13:51:31
 Description: 
 '''
 
@@ -16,15 +16,13 @@ from ...models.optimizers import OptimizerFactory
 from ...models.q_functions import QFunctionFactory
 from ...preprocessing import RewardScaler, Scaler
 from ...torch_utility import TorchMiniBatch
-from .dqn_impl import DoubleDQNImpl
+from .dqn_impl import DQNImpl
 
 
-class BayesianDiscreteDQNImpl(DoubleDQNImpl):
-    _alpha: float
-
-    """ Based on the Double DQN implementation. 
-        We overwrite compute_loss() which requires a new compute_error().
-        We leave _compute_conservative_loss() untouched since we use the original CQL.
+class BayesianDiscreteDQNImpl(DQNImpl):
+    """ Based on the DQN implementation with the following modifications:
+            (1) We use the same policy evaluation pipeline of C51 but adding a BC loss.
+            (2) For target value calculation and action selection, we are different from DQN.
     """
     def __init__(
         self,
@@ -35,11 +33,11 @@ class BayesianDiscreteDQNImpl(DoubleDQNImpl):
         encoder_factory: EncoderFactory,
         q_func_factory: QFunctionFactory,
         gamma: float,
-        alpha: float,
         n_critics: int,
         use_gpu: Optional[Device],
         scaler: Optional[Scaler],
         reward_scaler: Optional[RewardScaler],
+        beta_model,
     ):
         super().__init__(
             observation_shape=observation_shape,
@@ -56,4 +54,72 @@ class BayesianDiscreteDQNImpl(DoubleDQNImpl):
         )
 
         # the q function should always be bayesian q function
-        assert q_func_factory.get_type() in ['bayesian', 'c51'], 'BayesianDiscreteDQNImpl requires DiscreteBayesianQFunction or C51QFunctionFactory'
+        assert q_func_factory.get_type() in ['bayesian'], 'BayesianDiscreteDQNImpl requires DiscreteBayesianQFunction'
+
+        # beta policy learned from a BC model
+        self.beta_model = beta_model
+
+    def compute_loss(
+        self,
+        batch: TorchMiniBatch,
+        q_tpn: torch.Tensor,
+    ) -> torch.Tensor:
+        assert self._q_func is not None
+        return self._q_func.compute_error(
+            observations=batch.observations,
+            actions=batch.actions.long(),
+            rewards=batch.rewards,
+            target=q_tpn,
+            terminals=batch.terminals,
+            gamma=self._gamma**batch.n_steps,
+        )
+
+    def compute_target(self, batch: TorchMiniBatch) -> torch.Tensor:
+        assert self._targ_q_func is not None
+        with torch.no_grad():
+            # we get log probability from a BC model
+            log_probs_next_action = self.beta_model._impl._imitator(batch.next_observations)
+            return self._targ_q_func.compute_target(
+                batch.next_observations,
+                log_probs_next_action,
+                reduction="min",
+            )
+
+    def _predict_best_action(self, x: torch.Tensor) -> torch.Tensor:
+        assert self._q_func is not None
+        # NOTE: we change the forward() of _q_func to output p_R instead of q value
+        logits_a_and_R = self._q_func.forward_bayesian(x)
+        batch_size = logits_a_and_R.shape[0]
+        action_dim = logits_a_and_R.shape[1]
+        n_quantiles = logits_a_and_R.shape[2]
+        p_a_and_R = torch.softmax(logits_a_and_R.view(batch_size, action_dim*n_quantiles), dim=1)
+        p_a_and_R = p_a_and_R.view(batch_size, action_dim, n_quantiles)
+
+        # calculate the threshold for R (assume B=1)
+        # p(R) = \sum_{a} p(a, R)
+        p_R = torch.sum(p_a_and_R, dim=1) # [B, _n_quantiles]
+        sum = 0
+        c = 0.1
+        for idx in range(p_R.shape[1]-1, -1, -1):
+            sum += p_R[0, idx]
+            if sum >= c:
+                break
+
+        # calculate p(a, R|R > c)
+        logits_a_and_R_cond_c = logits_a_and_R[:, :, idx:].contiguous()
+        p_a_and_R_cond_c = torch.softmax(logits_a_and_R_cond_c.view(batch_size, action_dim*(n_quantiles-idx)), dim=1)
+        p_a_and_R_cond_c = p_a_and_R_cond_c.view(batch_size, action_dim, n_quantiles-idx)
+
+        # p(a |R > c) = \sum_{R} p(a, R|R > c)
+        p_a_cond_c = p_a_and_R_cond_c.sum(dim=2)
+
+        # sample from p(a|R > c)
+        #action = torch.distributions.Categorical(p_a_cond_c).sample()
+
+        # greedy
+        action = p_a_cond_c.argmax(dim=-1)
+
+        # use beta policy to select action
+        #log_probs_next_action = self.beta_model._impl._imitator(x)
+        #action = torch.exp(log_probs_next_action).argmax(dim=1)
+        return action

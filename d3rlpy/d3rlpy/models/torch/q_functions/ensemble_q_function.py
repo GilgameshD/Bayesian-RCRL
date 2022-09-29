@@ -139,6 +139,13 @@ class EnsembleQFunction(nn.Module):  # type: ignore
 
 
 class EnsembleDiscreteQFunction(EnsembleQFunction):
+    def forward_bayesian(self, x: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
+        # the shape of Bayesian-DQN's Q-value is [B, A, R] rather than [B, A]
+        values = []
+        for q_func in self._q_funcs:
+            values.append(q_func._compute_joint_logits(x)[None])
+        return _reduce_ensemble(torch.cat(values, dim=0), reduction)
+
     def forward(self, x: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
         values = []
         for q_func in self._q_funcs:

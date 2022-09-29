@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-09-13 16:43:23
+LastEditTime: 2022-09-24 15:55:51
 Description: 
 '''
 
@@ -36,25 +36,29 @@ class DiscreteC51QFunction(DiscreteQFunction, nn.Module):  # type: ignore
             encoder.get_feature_size(), action_size * n_quantiles
         )
 
+        self.device = 'cuda'
+
         # for C51
         self.Vmin = -10
         self.Vmax = 10
-        self.atoms = torch.linspace(self.Vmin, self.Vmax, self._n_quantiles, device='cuda')
+        self.atoms = torch.linspace(self.Vmin, self.Vmax, self._n_quantiles, device=self.device)
         self.delta_atom = float(self.Vmax - self.Vmin) / float(self._n_quantiles - 1)
         self.n_step = 1
 
     def _compute_distribution(self, h: torch.Tensor) -> torch.Tensor:
         h = cast(torch.Tensor, self._fc(h))
         h = h.view(-1, self._action_size, self._n_quantiles)
-        return F.softmax(h, dim=2)
+        prob = F.softmax(h, dim=2)
+        log_prob = F.log_softmax(h, dim=2)
+        return prob, log_prob
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         ''' Evaluate the Q-value of the state x'''
         h = self._encoder(x)
-        dists = self._compute_distribution(h)
+        prob, _ = self._compute_distribution(h)
 
         # multiply value by probability
-        q_value = (dists * self.atoms).sum(dim=2) # [B, _action_size]
+        q_value = (prob * self.atoms).sum(dim=2) # [B, _action_size]
         return q_value
 
     def compute_error(
@@ -73,30 +77,28 @@ class DiscreteC51QFunction(DiscreteQFunction, nn.Module):  # type: ignore
         atoms_target = rewards + gamma ** self.n_step * (1 - terminals) * self.atoms.view(1, -1) # [B, _n_quantiles]
         atoms_target.clamp_(self.Vmin, self.Vmax)
         atoms_target = atoms_target.unsqueeze(1) # [B, 1, _n_quantiles]
-        target_prob = (1 - (atoms_target - self.atoms.view(1, -1, 1)).abs() / self.delta_atom).clamp(0, 1) * target.unsqueeze(1) # [B, 1, _n_quantiles]
-        target_prob = target_prob.sum(-1) # [B, 1]
+        target_prob = (1 - (atoms_target - self.atoms.view(1, -1, 1)).abs() / self.delta_atom).clamp(0, 1) * target.unsqueeze(1) # [B, _n_quantiles, _n_quantiles]
+        target_prob = target_prob.sum(-1) # [B, _n_quantiles]
 
         # calculate distribution over all actions
         h = self._encoder(observations)
-        dists = self._compute_distribution(h)
-        action_idx = actions[:, None, None].repeat(1, 1, dists.shape[2])
-        dists = torch.gather(dists, dim=1, index=action_idx)    # [B, 1]
+        _, log_prob = self._compute_distribution(h)
+        batch_idx = torch.arange(observations.shape[0], device=self.device).long()
+        log_prob = log_prob[batch_idx, actions, :]
 
         # KL divergence
-        loss = (target_prob*target_prob.add(1e-5).log() - target_prob*dists.log()).sum(-1)
+        loss = (target_prob * target_prob.add(1e-5).log() - target_prob * log_prob).sum(dim=1)
         return compute_reduce(loss, reduction)
 
-    def compute_target(
-        self, x: torch.Tensor, action: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def compute_target(self, x: torch.Tensor, action: Optional[torch.Tensor] = None) -> torch.Tensor:
         h = self._encoder(x)
-        next_dist = self._compute_distribution(h)
+        next_prob, _ = self._compute_distribution(h)
 
         if action is None:
-            return next_dist
+            return next_prob
 
-        action_idx = action[:, None, None].repeat(1, 1, self._n_quantiles)
-        return next_dist.gather(dim=1, index=action_idx)
+        batch_idx = torch.arange(x.shape[0], device=self.device).long()
+        return next_prob[batch_idx, action, :]
 
     @property
     def action_size(self) -> int:

@@ -656,9 +656,9 @@ class LearnableBase:
                 # call callback if given
                 if callback:
                     callback(self, epoch, total_step, data_dict=loss)
-                    
+
                     # evaluate inside of the epoch
-                    if itr % eval_step_interval == 0 and scorers and eval_episodes:
+                    if total_step % eval_step_interval == 0 and scorers and eval_episodes:
                         self._evaluate(eval_episodes, scorers, logger)
                         # prepare the last value
                         data_dict = {k: self._eval_results[k][-1] for k in self._eval_results.keys()}

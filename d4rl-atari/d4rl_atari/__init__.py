@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-09 15:13:43
-LastEditTime: 2022-09-12 12:07:38
+LastEditTime: 2022-09-24 16:12:46
 Description: 
 '''
 from gym.envs.registration import register
@@ -26,46 +26,44 @@ for game in [
 
     max_episode_steps = 108000
     for index in range(5):
-        register(id='{}-mixed-v{}'.format(game, index),
-                 entry_point='d4rl_atari.envs:OfflineAtariEnv',
-                 max_episode_steps=max_episode_steps,
-                 kwargs={
-                     'game': game,
-                     'index': index + 1,
-                     'start_epoch': 1,
-                     'last_epoch': 1,
-                 })
+        register(
+            id='{}-mixed-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 1, 'last_epoch': 1}
+        )
 
-        register(id='{}-medium-v{}'.format(game, index),
-                 entry_point='d4rl_atari.envs:OfflineAtariEnv',
-                 max_episode_steps=max_episode_steps,
-                 kwargs={
-                     'game': game,
-                     'index': index + 1,
-                     'start_epoch': 10,
-                     'last_epoch': 10
-                 })
+        register(
+            id='{}-medium-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 10, 'last_epoch': 10}
+        )
 
-        register(id='{}-expert-v{}'.format(game, index),
-                 entry_point='d4rl_atari.envs:OfflineAtariEnv',
-                 max_episode_steps=max_episode_steps,
-                 kwargs={
-                     'game': game,
-                     'index': index + 1,
-                     'start_epoch': 50,
-                     'last_epoch': 50
-                 })
+        register(
+            id='{}-expert-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 50, 'last_epoch': 50}
+        )
+
+        register(
+            id='{}-more-expert-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 46, 'last_epoch': 50}
+        )
 
     '''
     for index in range(5):
         for epoch in range(50):
             register(id='{}-epoch-{}-v{}'.format(game, epoch + 1, index),
-                     entry_point='d4rl_atari.envs:OfflineAtariEnv',
-                     max_episode_steps=108000,
-                     kwargs={
-                         'game': game,
-                         'index': index + 1,
-                         'start_epoch': epoch + 1,
-                         'last_epoch': epoch + 1,
-                     })
+                        entry_point='d4rl_atari.envs:OfflineAtariEnv',
+                        max_episode_steps=108000,
+                        kwargs={
+                            'game': game,
+                            'index': index + 1,
+                            'start_epoch': epoch + 1,
+                            'last_epoch': epoch + 1,
+                        })
     '''

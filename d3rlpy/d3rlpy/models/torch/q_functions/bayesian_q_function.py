@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-09-13 13:29:52
+LastEditTime: 2022-09-29 11:58:06
 Description: 
 '''
 
@@ -36,39 +36,49 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
             encoder.get_feature_size(), action_size * n_quantiles
         )
 
+        self.device = 'cuda'
+        self.eps = 1e-5
+
         # for C51
         self.Vmin = -10
         self.Vmax = 10
-        self.atoms = torch.linspace(self.Vmin, self.Vmax, self._n_quantiles, device='cuda')
+        self.atoms = torch.linspace(self.Vmin, self.Vmax, self._n_quantiles, device=self.device)
         self.delta_atom = float(self.Vmax - self.Vmin) / float(self._n_quantiles - 1)
-        self.n_step = 1
 
-    def _compute_joint_logits(self, h: torch.Tensor) -> torch.Tensor:
+    def _compute_joint_logits(self, x: torch.Tensor) -> torch.Tensor:
+        h = self._encoder(x)
         h = cast(torch.Tensor, self._fc(h))
         return h.view(-1, self._action_size, self._n_quantiles)
 
     def _compute_R_dist(self, logits_a_and_R: torch.Tensor) -> list:
-        # from logits to probability
-        p_a_and_R = F.softmax(logits_a_and_R.view(-1, self._action_size * self._n_quantiles), dim=1)
-        p_a_and_R = p_a_and_R.view(-1, self._action_size, self._n_quantiles)
+        # log p(a|s) = log sum_{R} exp log p(a, R|s)
+        logits_a = torch.logsumexp(logits_a_and_R, dim=2)
 
-        # p(a|s) = sum_{R} p(a, R|s)
-        logits_a = p_a_and_R.sum(dim=2) # [B, _action_size]
+        # log p(a|s)= log sum_{R} p(a, R|s)
+        #p_a_and_R = torch.softmax(logits_a_and_R.view(-1, self.action_size*self._n_quantiles), dim=1)
+        #p_a_and_R = p_a_and_R.view(-1, self.action_size, self._n_quantiles)
+        #logits_a = torch.sum(p_a_and_R, dim=2).log()
+
+        #p_a_and_R = torch.log_softmax(logits_a_and_R.view(-1, self.action_size*self._n_quantiles), dim=1)
+        #p_a_and_R = p_a_and_R.view(-1, self.action_size, self._n_quantiles)
+        #logits_a = torch.logsumexp(p_a_and_R, dim=2)
 
         # p(R|s, a) = p(a, R|s) / p(a | s)
-        #p_R = p_a_and_R / logits_a[:, :, None] # [B, _action_size, _n_quantiles]
-        # use softmax and log-softmax
-        p_R = F.softmax(p_a_and_R, dim=2)
-        return p_R, logits_a
+        p_R_given_a = F.softmax(logits_a_and_R, dim=2)
+        log_p_R_given_a = F.log_softmax(logits_a_and_R, dim=2)
+        return p_R_given_a, log_p_R_given_a, logits_a
+
+    def _compute_values(self, x: torch.Tensor) -> torch.Tensor:
+        logits_a_and_R = self._compute_joint_logits(x)
+        p_R_given_a, log_p_R_given_a, logits_a = self._compute_R_dist(logits_a_and_R)
+        return p_R_given_a, log_p_R_given_a, logits_a
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        ''' Evaluate the Q-value of the state x'''
-        h = self._encoder(x)
-        logits_a_and_R = self._compute_joint_logits(h)
-        p_R, _ = self._compute_R_dist(logits_a_and_R)
+        ''' Evaluate the Q-value of state x '''
+        p_R_given_a, _, _ = self._compute_values(x)
 
         # multiply value by probability
-        q_value = (p_R * self.atoms).sum(dim=2) # [B, _action_size]
+        q_value = (p_R_given_a * self.atoms.view(1, 1, -1)).sum(dim=2) # [B, _action_size]
         return q_value
 
     def compute_error(
@@ -81,45 +91,47 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         gamma: float = 0.99,
         reduction: str = "mean",
     ) -> torch.Tensor:
-        assert target.shape == (observations.shape[0], self._n_quantiles)
 
-        # calculate C51 TD error
-        atoms_target = rewards + gamma ** self.n_step * (1 - terminals) * self.atoms.view(1, -1) # [B, _n_quantiles]
-        atoms_target.clamp_(self.Vmin, self.Vmax)
-        atoms_target = atoms_target.unsqueeze(1) # [B, 1, _n_quantiles]
-        target_prob = (1 - (atoms_target - self.atoms.view(1, -1, 1)).abs() / self.delta_atom).clamp(0, 1) * target.unsqueeze(1) # [B, 1, _n_quantiles]
-        target_prob = target_prob.sum(-1) # [B, 1]
+        target_p_R = target.unsqueeze(1)
+        assert target_p_R.shape == (observations.shape[0], 1, self._n_quantiles)
 
-        # p(a, R|s)
-        h = self._encoder(observations)
-        logits_a_and_R = self._compute_joint_logits(h)
-        p_R, logits_a = self._compute_R_dist(logits_a_and_R)
+        # calculate bellman operator TZ
+        TZ = rewards + gamma * (1 - terminals) * self.atoms.view(1, -1) # [B, _n_quantiles]
+        TZ = TZ.clamp(self.Vmin, self.Vmax).unsqueeze(1) # [B, 1, _n_quantiles]
 
-        action_idx = actions[:, None, None].repeat(1, 1, p_R.shape[2])
-        p_R = torch.gather(p_R, dim=1, index=action_idx)    # [B, 1]
-        #p_R = pick_quantile_value_by_action(p_R, actions)  # [B, 1]
+        # calculate quotient
+        quotient = 1 - (TZ - self.atoms.view(1, -1, 1)).abs() / self.delta_atom  # [B, _n_quantiles, _n_quantiles]
+        quotient = quotient.clamp(0, 1)
+        
+        # projected bellman operator \Phi TZ
+        # no gradient for target distribution
+        projected_TZ = quotient * target_p_R.detach() # [B, _n_quantiles, _n_quantiles]
+        projected_TZ = projected_TZ.sum(dim=2) # [B, _n_quantiles]
 
-        # log p(R|s, a)
-        loss_R = (target_prob * target_prob.add(1e-5).log() - target_prob * p_R.log()).sum(-1)
+        # get p(R|s, a) and p(a|s)
+        _, log_p_R_given_a, logits_a = self._compute_values(observations) # [B, _action_size, _n_quantiles], [B, _action_size]
+        batch_idx = torch.arange(observations.shape[0], device=self.device).long()
+        log_p_R_given_a = log_p_R_given_a[batch_idx, actions, :]
 
-        # log p(a|s)
-        loss_A = F.cross_entropy(logits_a, actions.reshape(-1))
-        loss = loss_R
+        # TD loss (KL)
+        loss_R = (projected_TZ * projected_TZ.add(self.eps).log() - projected_TZ * log_p_R_given_a).sum(dim=1)
+
+        # BC loss
+        #loss_A = F.nll_loss(log_prob, actions.reshape(-1))
+        loss_A = F.cross_entropy(logits_a, actions.reshape(-1)) 
+
+        loss = loss_A + loss_R 
         return compute_reduce(loss, reduction)
 
-    def compute_target(
-        self, x: torch.Tensor, action: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
-        h = self._encoder(x)
-        logits_a_and_R = self._compute_joint_logits(h)
-        p_R_next, _ = self._compute_R_dist(logits_a_and_R)
+    def compute_target(self, observations_next: torch.Tensor, log_probs_next_action: Optional[torch.Tensor] = None) -> torch.Tensor:
+        p_R_given_a_next, _, _ = self._compute_values(observations_next) # [B, _action_size, _n_quantiles], _
 
-        if action is None:
-            return p_R_next
+        if log_probs_next_action is None:
+            return p_R_given_a_next
 
-        action_idx = action[:, None, None].repeat(1, 1, p_R_next.shape[2])
-        return torch.gather(p_R_next, dim=1, index=action_idx)
-        #return pick_quantile_value_by_action(p_R_next, action)
+        # p(R|s') = \sum_{a'} p(a'| s') * p(R | a', s')
+        p_R = (torch.exp(log_probs_next_action).unsqueeze(-1) * p_R_given_a_next).sum(dim=1)
+        return p_R
 
     @property
     def action_size(self) -> int:
