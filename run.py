@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-09-29 11:59:29
+LastEditTime: 2022-10-04 10:36:26
 Description: 
 '''
 
@@ -28,8 +28,8 @@ from sklearn.model_selection import train_test_split
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--env_name', type=str, default='breakout', help='[cartpole, breakout, pong]')
-parser.add_argument('--model_name', type=str, default='bayes', help='[dqn, cql, bayes, bc')
-parser.add_argument('--qf_name', type=str, default='bayes', help='[mean, c51, qr, iqn, fqf, bayes, none')
+parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
+parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
 parser.add_argument('--mode', type=str, default='offline', help='[offline, online]')
 args = parser.parse_args()
 
@@ -60,16 +60,24 @@ if args.env_name == 'cartpole':
         eval_env = gym.make('cartpole-v1')
 elif args.env_name == 'breakout':
     model_dir = './model/breakout'
+    threshold_c = 0.1    # condition threshold used in testing
+    penalty_w = 0.5      # weight of action L2 penalty
+    weight_R = 2.0
     beta_epoch = 2
     batch_size = 32
     alpha = 4.0
     n_quantiles = 51
-    learning_rate = 0.0001
+    if args.model_name == 'bc':
+        learning_rate = 0.00025
+    elif args.model_name in ['bayes', 'dqn'] and args.qf_name in ['bayes', 'c51']:
+        learning_rate = 0.00025
+    else:
+        learning_rate = 0.0001
     target_update_interval = 8000
     n_frames = 4
     scaler = 'pixel'
     encoder = 'pixel'
-    n_epochs = 50
+    n_epochs = 10
     test_epsilon = 0.01 # breakout needs random action to fire the ball
     eval_step_interval = 10000
     if args.mode == 'offline':
@@ -146,11 +154,13 @@ config = {
     'qf': args.qf_name,
     'bs': batch_size,
     'nc': n_quantiles,
+    'c': threshold_c,
     'lr': learning_rate,
     'tui': target_update_interval,
     'd': dataset_type,
     'te': test_epsilon,
-    'l': 'all_more',
+    'pw': penalty_w,
+    'Rw': weight_R,
 }
 group_name = ''.join([k_i + '_' + str(config[k_i]) + '_' for k_i in config.keys()])
 def wandb_callback(algo, epoch, total_step, data_dict):
@@ -189,6 +199,9 @@ for t_i in range(0, len(seed_list)):
         encoder_factory=encoder,
         scaler=scaler,
         alpha=alpha,
+        threshold_c=threshold_c,
+        penalty_w=penalty_w,
+        weight_R=weight_R,
         use_gpu=True,
     )
 

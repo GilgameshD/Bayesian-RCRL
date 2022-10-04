@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-09-20 18:51:52
+LastEditTime: 2022-10-03 20:20:03
 Description: 
 '''
 
@@ -42,6 +42,9 @@ class BayesianDiscreteDQN(DQN):
         gamma: float = 0.99,
         n_critics: int = 1,
         target_update_interval: int = 8000,
+        threshold_c: float = 1.0,
+        penalty_w: float = 0.0,
+        weight_R: float = 1.0,
         use_gpu: UseGPUArg = False,
         scaler: ScalerArg = None,
         reward_scaler: RewardScalerArg = None,
@@ -65,6 +68,11 @@ class BayesianDiscreteDQN(DQN):
             impl=impl,
             **kwargs,
         )
+
+        # condition c used for testing
+        self.threshold_c = threshold_c
+        self.penalty_w = penalty_w
+        self.weight_R = weight_R
 
         # this is a pre-trained model used for \beta
         self.beta_model = DiscreteBC(
@@ -93,6 +101,9 @@ class BayesianDiscreteDQN(DQN):
             scaler=self._scaler,
             reward_scaler=self._reward_scaler,
             beta_model=self.beta_model,
+            threshold_c=self.threshold_c,
+            penalty_w=self.penalty_w,
+            weight_R=self.weight_R,
         )
         self._impl.build()
 

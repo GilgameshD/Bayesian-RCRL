@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-09-22 13:51:31
+LastEditTime: 2022-10-03 20:53:00
 Description: 
 '''
 
@@ -38,6 +38,9 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         scaler: Optional[Scaler],
         reward_scaler: Optional[RewardScaler],
         beta_model,
+        threshold_c,
+        penalty_w,
+        weight_R,
     ):
         super().__init__(
             observation_shape=observation_shape,
@@ -58,6 +61,9 @@ class BayesianDiscreteDQNImpl(DQNImpl):
 
         # beta policy learned from a BC model
         self.beta_model = beta_model
+        self.threshold_c = threshold_c
+        self.penalty_w = penalty_w
+        self.weight_R = weight_R
 
     def compute_loss(
         self,
@@ -72,6 +78,8 @@ class BayesianDiscreteDQNImpl(DQNImpl):
             target=q_tpn,
             terminals=batch.terminals,
             gamma=self._gamma**batch.n_steps,
+            penalty_w=self.penalty_w,
+            weight_R=self.weight_R,
         )
 
     def compute_target(self, batch: TorchMiniBatch) -> torch.Tensor:
@@ -99,10 +107,9 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         # p(R) = \sum_{a} p(a, R)
         p_R = torch.sum(p_a_and_R, dim=1) # [B, _n_quantiles]
         sum = 0
-        c = 0.1
         for idx in range(p_R.shape[1]-1, -1, -1):
             sum += p_R[0, idx]
-            if sum >= c:
+            if sum >= self.threshold_c:
                 break
 
         # calculate p(a, R|R > c)
