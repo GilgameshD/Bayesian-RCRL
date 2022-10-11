@@ -75,6 +75,7 @@ class OfflineEnv(gym.Env):
                  game=None,
                  index=None,
                  start_epoch=None,
+                 step_size=1,
                  last_epoch=None,
                  stack=False,
                  **kwargs):
@@ -83,6 +84,7 @@ class OfflineEnv(gym.Env):
         self.index = index
         self.start_epoch = start_epoch
         self.last_epoch = last_epoch
+        self.step_size = step_size
         self.stack = stack
 
     def get_dataset(self):
@@ -90,7 +92,7 @@ class OfflineEnv(gym.Env):
         action_stack = []
         reward_stack = []
         terminal_stack = []
-        for epoch in range(self.start_epoch, self.last_epoch + 1):
+        for epoch in range(self.start_epoch, self.last_epoch + 1, self.step_size):
             path = get_dir_path(self.game, self.index, epoch)
             if not inspect_dir_path(self.game, self.index, epoch):
                 os.makedirs(path, exist_ok=True)

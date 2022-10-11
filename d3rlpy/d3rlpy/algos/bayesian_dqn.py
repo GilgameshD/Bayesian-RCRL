@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-03 20:20:03
+LastEditTime: 2022-10-10 23:23:04
 Description: 
 '''
 
@@ -32,7 +32,8 @@ class BayesianDiscreteDQN(DQN):
     def __init__(
         self,
         *,
-        learning_rate: float = 6.25e-5,
+        beta_learning_rate: float = 0.00025,
+        learning_rate: float = 0.00025,
         optim_factory: OptimizerFactory = AdamFactory(),
         encoder_factory: EncoderArg = "default",
         q_func_factory: QFuncArg = "mean",
@@ -43,8 +44,6 @@ class BayesianDiscreteDQN(DQN):
         n_critics: int = 1,
         target_update_interval: int = 8000,
         threshold_c: float = 1.0,
-        penalty_w: float = 0.0,
-        weight_R: float = 1.0,
         use_gpu: UseGPUArg = False,
         scaler: ScalerArg = None,
         reward_scaler: RewardScalerArg = None,
@@ -71,14 +70,12 @@ class BayesianDiscreteDQN(DQN):
 
         # condition c used for testing
         self.threshold_c = threshold_c
-        self.penalty_w = penalty_w
-        self.weight_R = weight_R
 
         # this is a pre-trained model used for \beta
         self.beta_model = DiscreteBC(
             batch_size=batch_size,
             n_frames=n_frames,
-            learning_rate=learning_rate,
+            learning_rate=beta_learning_rate,
             q_func_factory=None,
             encoder_factory=encoder_factory,
             scaler=scaler,
@@ -102,12 +99,10 @@ class BayesianDiscreteDQN(DQN):
             reward_scaler=self._reward_scaler,
             beta_model=self.beta_model,
             threshold_c=self.threshold_c,
-            penalty_w=self.penalty_w,
-            weight_R=self.weight_R,
         )
         self._impl.build()
 
-    def fit_beta_policy(self, model_dir, env, dataset, n_epochs) -> None:
+    def fit_beta_policy(self, model_dir, dataset, n_epochs) -> None:
         ''' Fit policy \beta(a|s) based on the entire dataset'''
 
         # create the folders
@@ -119,15 +114,16 @@ class BayesianDiscreteDQN(DQN):
             print('Beta model already exist, loading model...')
             self.beta_model.build_with_dataset(dataset)
             self.beta_model.load_model(model_path)
-            return
-        
-        # fit beta policy model
-        print('Training beta model...')
-        self.beta_model.fit(
-            dataset=dataset,
-            n_epochs=n_epochs,
-            verbose=False,
-            save_metrics=False,
-            eval_step_interval=10000000,
-        )
-        self.beta_model.save_model(model_path)
+        else:
+            # fit beta policy model
+            print('Training beta model...')
+            self.beta_model.fit(
+                dataset=dataset,
+                n_epochs=n_epochs,
+                verbose=False,
+                save_metrics=False,
+                eval_step_interval=10000000,
+            )
+            # skip saving if other process already saves the model
+            if not os.path.exists(model_path):
+                self.beta_model.save_model(model_path)

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-04 10:36:26
+LastEditTime: 2022-10-11 12:26:13
 Description: 
 '''
 
@@ -10,7 +10,9 @@ import argparse
 import random
 import numpy as np
 import torch 
-import gym
+import os
+import wandb
+from sklearn.model_selection import train_test_split
 
 import d3rlpy
 from d3rlpy.models.q_functions import (
@@ -22,98 +24,56 @@ from d3rlpy.models.q_functions import (
     C51QFunctionFactory, 
 )
 
-import wandb
-from sklearn.model_selection import train_test_split
-
 
 parser = argparse.ArgumentParser()
+parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('--env_name', type=str, default='breakout', help='[cartpole, breakout, pong]')
-parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
-parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('--mode', type=str, default='offline', help='[offline, online]')
+parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
+
+parser.add_argument('--model_name', type=str, default='bayes', help='[dqn, cql, bayes, bc')
+parser.add_argument('--qf_name', type=str, default='bayes', help='[mean, c51, qr, iqn, fqf, bayes, none')
+parser.add_argument('-dt', '--dataset_type', type=str, default='mixed', help='[mixed, medium, expert]')
+
+# beta policy model
+parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
+parser.add_argument('-be', '--beta_epoch', type=float, default=2, help='number of epoch for training beta policy (using BC)')
+parser.add_argument('-blr', '--beta_learning_rate', type=float, default=0.00025, help='learning rate of beta policy model')
+
+# training parameters
+parser.add_argument('-ne', '--n_epochs', type=int, default=15, help='number of training epoch')
+parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch size')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.00025, help='learning rate')
+
+# test parameters
+parser.add_argument('-te', '--test_epsilon', type=float, default=0.01, help='use epsilon greedy during testing stage')
+parser.add_argument('-esi', '--eval_step_interval', type=int, default=10000, help='interval of step of calling evaluation')
+parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of online evaluation trails')
+
+# Bayesian Q parameters
+parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
+parser.add_argument('-wp', '--weight_penalty', type=float, default=0.5, help='weight of action L2 penalty for loss A')
+parser.add_argument('-wR', '--weight_R', type=float, default=20.0, help='weight of loss R')
+parser.add_argument('-nq', '--n_quantiles', type=int, default=51, help='number of quantile for C51 q-value')
+parser.add_argument('-tui', '--target_update_interval', type=int, default=8000, help='target update interval for q learning')
+
+# CQL parameters 
+parser.add_argument('-a', '--alpha', type=float, default=4.0, help='weight of conservative loss in CQL')
+
 args = parser.parse_args()
 
 
-# select parameters
-if args.env_name == 'cartpole':
-    beta_epoch = 10
-    model_dir = './model/cartpole'
-    batch_size = 64
-    n_quantiles = 51
-    alpha = 1.0
-    learning_rate = 0.00002
-    target_update_interval = 2000
-    n_frames = 1
+# process some parameters
+project = 'bayesian-'+args.env_name+'-sweep'
+beta_model_dir = os.path.join(args.beta_model_base, args.env_name, args.dataset_type)
+dataset, env = d3rlpy.datasets.get_atari(args.env_name+'-more-'+args.dataset_type+'-v0')
+if args.env_type == 'atari':
+    scaler = 'pixel'
+    encoder = 'pixel'
+    n_frames = 4
+else:
     scaler = 'standard'
     encoder = 'default'
-    n_epochs = 50
-    test_epsilon = 0.0
-    eval_step_interval = 1000
-    if args.mode == 'offline':
-        # offline parameters
-        dataset_type = 'replay' # random
-        dataset, env = d3rlpy.datasets.get_cartpole(dataset_type='replay')
-    else:
-        # online parameter
-        buffer_maxlen = 1000000
-        n_steps = 1000000
-        eval_env = gym.make('cartpole-v1')
-elif args.env_name == 'breakout':
-    model_dir = './model/breakout'
-    threshold_c = 0.1    # condition threshold used in testing
-    penalty_w = 0.5      # weight of action L2 penalty
-    weight_R = 2.0
-    beta_epoch = 2
-    batch_size = 32
-    alpha = 4.0
-    n_quantiles = 51
-    if args.model_name == 'bc':
-        learning_rate = 0.00025
-    elif args.model_name in ['bayes', 'dqn'] and args.qf_name in ['bayes', 'c51']:
-        learning_rate = 0.00025
-    else:
-        learning_rate = 0.0001
-    target_update_interval = 8000
-    n_frames = 4
-    scaler = 'pixel'
-    encoder = 'pixel'
-    n_epochs = 10
-    test_epsilon = 0.01 # breakout needs random action to fire the ball
-    eval_step_interval = 10000
-    if args.mode == 'offline':
-        # offline parameters
-        dataset_type = 'expert' # mixed, medium, expert
-        dataset, env = d3rlpy.datasets.get_atari('breakout-more-'+dataset_type+'-v0')
-    else:
-        # online parameter
-        buffer_maxlen = 1000000
-        n_steps = 1000000
-        eval_env = gym.make('BreakoutNoFrameskip-v4')
-elif args.env_name == 'pong':
-    model_dir = './model/pong'
-    beta_epoch = 3
-    batch_size = 32
-    alpha = 4.0
-    n_quantiles = 51
-    learning_rate = 0.0001
-    target_update_interval = 8000
-    n_frames = 4
-    scaler = 'pixel'
-    encoder = 'pixel'
-    n_epochs = 13
-    test_epsilon = 0.0
-    eval_step_interval = 1000
-    if args.mode == 'offline':
-        # offline parameters
-        dataset_type = 'expert' # mixed, medium, expert
-        dataset, env = d3rlpy.datasets.get_atari('pong-'+dataset_type+'-v0')
-    else:
-        # online parameter
-        buffer_maxlen = 1000000
-        n_steps = 1000000
-        eval_env = gym.make('PongNoFrameskip-v4')
-else:
-    raise ValueError('Unknown environment name')
+    n_frames = 1
 
 
 # select model
@@ -128,19 +88,19 @@ Model = model_list[args.model_name]
 
 # select q function
 qf_list = {
-    'mean': MeanQFunctionFactory(n_quantiles=n_quantiles),
-    'bayes': BayesianQFunctionFactory(n_quantiles=n_quantiles),
-    'qr': QRQFunctionFactory(n_quantiles=n_quantiles),
-    'iqn': IQNQFunctionFactory(n_quantiles=n_quantiles),
-    'fqf': FQFQFunctionFactory(n_quantiles=n_quantiles),
-    'c51': C51QFunctionFactory(n_quantiles=n_quantiles),
+    'mean': MeanQFunctionFactory(n_quantiles=args.n_quantiles),
+    'bayes': BayesianQFunctionFactory(n_quantiles=args.n_quantiles, weight_penalty=args.weight_penalty, weight_R=args.weight_R),
+    'qr': QRQFunctionFactory(n_quantiles=args.n_quantiles),
+    'iqn': IQNQFunctionFactory(n_quantiles=args.n_quantiles),
+    'fqf': FQFQFunctionFactory(n_quantiles=args.n_quantiles),
+    'c51': C51QFunctionFactory(n_quantiles=args.n_quantiles),
     'none': None
 }
 q_func = qf_list[args.qf_name]
 
 
 # select evaluation metrics
-scorers = {'environment': d3rlpy.metrics.evaluate_on_environment(env, n_trials=10, epsilon=test_epsilon)}
+scorers = {'environment': d3rlpy.metrics.evaluate_on_environment(env, n_trials=args.n_trials, epsilon=args.test_epsilon)}
 if args.model_name in ['bc']:
     scorers.update({'action_match': d3rlpy.metrics.scorer.discrete_action_match_scorer})
 else:
@@ -152,15 +112,17 @@ config = {
     'env': args.env_name,
     'm': args.model_name,
     'qf': args.qf_name,
-    'bs': batch_size,
-    'nc': n_quantiles,
-    'c': threshold_c,
-    'lr': learning_rate,
-    'tui': target_update_interval,
-    'd': dataset_type,
-    'te': test_epsilon,
-    'pw': penalty_w,
-    'Rw': weight_R,
+    'bs': args.batch_size,
+    'nc': args.n_quantiles,
+    'c': args.threshold_c,
+    'lr': args.learning_rate,
+    'tui': args.target_update_interval,
+    'd': args.dataset_type,
+    'te': args.test_epsilon,
+    'wp': args.weight_penalty,
+    'wR': args.weight_R,
+    'be': args.beta_epoch,
+    'ne': args.n_epochs,
 }
 group_name = ''.join([k_i + '_' + str(config[k_i]) + '_' for k_i in config.keys()])
 def wandb_callback(algo, epoch, total_step, data_dict):
@@ -178,53 +140,51 @@ def set_seed(seed):
 
 
 # start training
-for t_i in range(0, len(seed_list)):
+for t_i in range(len(seed_list)):
     # set random seed
     seed = seed_list[t_i]
     #set_seed(seed)
-    train_episodes, test_episodes = train_test_split(dataset, test_size=0.1, shuffle=True)
+
+    # have to use test episode to run scores
+    train_episodes, test_episodes = train_test_split(dataset, test_size=0.01, shuffle=True)
 
     # init wandb
     name = group_name + 'seed_' + str(seed)
-    run = wandb.init(project="bayesian-"+args.env_name, entity="rlresearch", group=group_name, name=name, reinit=True) 
+    run = wandb.init(project=project, entity='rlresearch', group=group_name, name=name, reinit=True, dir=args.wandb_dir) 
     wandb.config.update(config)
 
     # model 
     model = Model(
-        batch_size=batch_size,
+        batch_size=args.batch_size,
         n_frames=n_frames,
-        learning_rate=learning_rate,
-        target_update_interval=target_update_interval,
+        beta_learning_rate=args.beta_learning_rate,
+        learning_rate=args.learning_rate,
+        target_update_interval=args.target_update_interval,
         q_func_factory=q_func,
         encoder_factory=encoder,
         scaler=scaler,
-        alpha=alpha,
-        threshold_c=threshold_c,
-        penalty_w=penalty_w,
-        weight_R=weight_R,
+        alpha=args.alpha,
+        threshold_c=args.threshold_c,
         use_gpu=True,
     )
 
-    # training
-    if args.mode == 'offline':
-        # for Bayesian-DQN model, we need a pre-train model
-        if args.model_name == 'bayes':
-            model.fit_beta_policy(model_dir=model_dir, env=env, dataset=dataset, n_epochs=beta_epoch)
-
-        # fit model
-        model.fit(
-            dataset=train_episodes,
-            eval_episodes=test_episodes,
-            n_epochs=n_epochs,
-            scorers=scorers,
-            callback=wandb_callback,
-            verbose=False,
-            save_metrics=False,
-            eval_step_interval=eval_step_interval,
+    # for Bayesian-DQN model, we need a pre-train model
+    if args.model_name == 'bayes': 
+        model.fit_beta_policy(
+            model_dir=beta_model_dir, 
+            dataset=dataset, 
+            n_epochs=args.beta_epoch,
         )
-    else:
-        # prepare replay buffer
-        buffer = d3rlpy.online.buffers.ReplayBuffer(maxlen=buffer_maxlen, env=env)
-        model.fit_online(env, buffer, n_steps=n_steps, eval_env=eval_env)
 
+    # fit model
+    model.fit(
+        dataset=train_episodes,
+        eval_episodes=test_episodes,
+        n_epochs=args.n_epochs,
+        scorers=scorers,
+        callback=wandb_callback,
+        verbose=False,
+        save_metrics=False,
+        eval_step_interval=args.eval_step_interval,
+    )
     run.finish()

@@ -1,5 +1,6 @@
 gym[accept-rom-license]==0.23.1
 ale-py==0.7.5
+torch==1.11.0
 numpy
 tqdm
 wandb

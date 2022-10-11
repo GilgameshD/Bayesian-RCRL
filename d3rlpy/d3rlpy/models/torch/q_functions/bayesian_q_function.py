@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-03 20:17:59
+LastEditTime: 2022-10-07 18:48:25
 Description: 
 '''
 
@@ -27,7 +27,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
     _n_quantiles: int
     _fc: nn.Linear
 
-    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int):
+    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int, weight_penalty: float, weight_R: float):
         super().__init__()
         self._encoder = encoder
         self._action_size = action_size
@@ -38,6 +38,10 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
 
         self.device = 'cuda'
         self.eps = 1e-5
+
+        # weights for loss
+        self.weight_penalty = weight_penalty
+        self.weight_R = weight_R
 
         # for C51
         self.Vmin = -10
@@ -85,8 +89,6 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         target: torch.Tensor,
         terminals: torch.Tensor,
         gamma: float = 0.99,
-        penalty_w: float = 0.0,
-        weight_R: float = 1.0,
         reduction: str = "mean",
     ) -> torch.Tensor:
 
@@ -115,11 +117,11 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         loss_R = (projected_TZ * projected_TZ.add(self.eps).log() - projected_TZ * log_p_R_given_a).sum(dim=1)
 
         # BC loss
-        action_penalty = penalty_w * (logits_a**2).mean(dim=1)
+        action_penalty = self.weight_penalty * (logits_a**2).mean(dim=1)
         #loss_A = F.nll_loss(logits_a, actions.reshape(-1), reduction='none') + action_penalty
         loss_A = F.cross_entropy(logits_a, actions.reshape(-1), reduction='none') + action_penalty
 
-        loss = loss_A + weight_R * loss_R 
+        loss = loss_A + self.weight_R * loss_R 
         return compute_reduce(loss, reduction)
 
     def compute_target(self, observations_next: torch.Tensor, log_probs_next_action: Optional[torch.Tensor] = None) -> torch.Tensor:

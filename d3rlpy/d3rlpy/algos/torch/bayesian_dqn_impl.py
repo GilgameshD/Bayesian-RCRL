@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-03 20:53:00
+LastEditTime: 2022-10-07 18:43:51
 Description: 
 '''
 
@@ -39,8 +39,6 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         reward_scaler: Optional[RewardScaler],
         beta_model,
         threshold_c,
-        penalty_w,
-        weight_R,
     ):
         super().__init__(
             observation_shape=observation_shape,
@@ -62,8 +60,6 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         # beta policy learned from a BC model
         self.beta_model = beta_model
         self.threshold_c = threshold_c
-        self.penalty_w = penalty_w
-        self.weight_R = weight_R
 
     def compute_loss(
         self,
@@ -78,8 +74,6 @@ class BayesianDiscreteDQNImpl(DQNImpl):
             target=q_tpn,
             terminals=batch.terminals,
             gamma=self._gamma**batch.n_steps,
-            penalty_w=self.penalty_w,
-            weight_R=self.weight_R,
         )
 
     def compute_target(self, batch: TorchMiniBatch) -> torch.Tensor:

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-09 15:13:43
-LastEditTime: 2022-09-24 16:12:46
+LastEditTime: 2022-10-10 12:22:33
 Description: 
 '''
 from gym.envs.registration import register
@@ -47,6 +47,23 @@ for game in [
             kwargs={'game': game, 'index': index + 1, 'start_epoch': 50, 'last_epoch': 50}
         )
 
+        # 1, 2, 3, 4, 5
+        register(
+            id='{}-more-mixed-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 1, 'last_epoch': 5}
+        )
+
+        # 10, 20, 30, 40, 50
+        register(
+            id='{}-more-medium-v{}'.format(game, index),
+            entry_point='d4rl_atari.envs:OfflineAtariEnv',
+            max_episode_steps=max_episode_steps,
+            kwargs={'game': game, 'index': index + 1, 'start_epoch': 10, 'step_size': 10, 'last_epoch': 50}
+        )
+
+        # 46, 47, 48, 49, 50
         register(
             id='{}-more-expert-v{}'.format(game, index),
             entry_point='d4rl_atari.envs:OfflineAtariEnv',
