@@ -1,5 +1,5 @@
 # Base Image
-FROM anibali/pytorch:1.11.0-cuda11.3-ubuntu20.04
+FROM anibali/pytorch:1.11.0-cuda11.5-ubuntu20.04
 
 # Set up time zone.
 ENV TZ=UTC
