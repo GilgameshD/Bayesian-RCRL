@@ -16,8 +16,10 @@ RUN sudo apt-get update -q \
     && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/*
 
+# create directory
+RUN /bin/bash -c "mkdir user; cd user"
+
 # Install miniconda 
-WORKDIR /user
 RUN curl -LO http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && bash Miniconda3-latest-Linux-x86_64.sh -p /user/miniconda -b
 RUN rm /user/Miniconda3-latest-Linux-x86_64.sh
@@ -29,7 +31,6 @@ ENV PATH=/user/miniconda/envs/bayesian_dqn/bin:${PATH}
 
 # download code (temporally use bitbucket)
 RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
-WORKDIR /user/bayesian-dqn
 
 # run setup.sh
-RUN /bin/bash -c "conda activate bayesian_dqn; ./setup.sh"
+RUN /bin/bash -c "conda activate bayesian_dqn; cd Bayesian-DQN; ./setup.sh"
