@@ -33,4 +33,5 @@ ENV PATH=/user/miniconda/envs/bayesian_dqn/bin:${PATH}
 RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # run setup.sh
-RUN /bin/bash -c "conda activate bayesian_dqn; cd Bayesian-DQN; ./setup.sh"
+RUN /bin/bash -c "conda init bash; conda activate bayesian_dqn; cd Bayesian-DQN"
+RUN /bin/bash -c "chmod 777 ./setup.sh; ./setup.sh"
