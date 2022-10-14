@@ -28,7 +28,7 @@ RUN conda create -n bayesian_dqn python=3.8
 ENV PATH=/user/miniconda/envs/bayesian_dqn/bin:${PATH}
 
 # download code (temporally use bitbucket)
-RUN git clone https://wenhaoding@bitbucket.org/wenhaoding/bayesian-dqn.git
+RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
 WORKDIR /user/bayesian-dqn
 
 # run setup.sh
