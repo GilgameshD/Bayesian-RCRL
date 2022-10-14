@@ -16,23 +16,23 @@ RUN sudo apt-get update -q \
     && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/*
 
-# create directory
-RUN /bin/bash -c "mkdir user; cd user"
-
 # Install miniconda 
-RUN curl -LO http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && bash Miniconda3-latest-Linux-x86_64.sh -p ./miniconda -b
-RUN rm ./Miniconda3-latest-Linux-x86_64.sh
-ENV PATH=/home/user/miniconda/bin:${PATH}
-RUN source /home/user/.bashrc
+#RUN curl -LO https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+#    && bash Miniconda3-latest-Linux-x86_64.sh -p $HOME/miniconda -b
+#RUN rm ./Miniconda3-latest-Linux-x86_64.sh
+#ENV PATH=$HOME/miniconda/bin:${PATH}
 
 # Create the conda env
-RUN conda create -n bayesian_dqn python=3.8
-ENV PATH=/user/miniconda/envs/bayesian_dqn/bin:${PATH}
+#RUN conda create -n bayesian_dqn python=3.8
+#ENV PATH=$HOME/miniconda/envs/bayesian_dqn/bin:${PATH}
+#RUN conda activate bayesian_dqn
 
 # download code from github
+WORKDIR $HOME
 RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # run setup.sh
-RUN /bin/bash -c "conda activate bayesian_dqn; cd Bayesian-DQN"
-RUN /bin/bash -c "chmod 777 ./setup.sh; ./setup.sh"
+WORKDIR $HOME/Bayesian-DQN
+RUN sh ./setup.sh
+
+CMD ["python3 run.py"]
