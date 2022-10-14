@@ -1,13 +1,14 @@
 # Base Image
 FROM anibali/pytorch:1.11.0-cuda11.5-ubuntu20.04
 
-# Set up time zone.
+# Set up time zone
 ENV TZ=UTC
 RUN sudo ln -snf /usr/share/zoneinfo/$TZ /etc/localtime
 
 # Setup basic packages 
 RUN sudo apt-get update -q \
     && DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+    g++ \
     curl \
     git \
     cmake \
@@ -34,5 +35,3 @@ RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
 # run setup.sh
 WORKDIR $HOME/Bayesian-DQN
 RUN sh ./setup.sh
-
-CMD ["python3 run.py"]
