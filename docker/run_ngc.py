@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-11 13:03:07
+LastEditTime: 2022-10-13 14:20:46
 Description: 
 '''
 
@@ -23,8 +23,9 @@ command = """ngc batch run \
         --env_name={} \
         --dataset_type={} \
         --model_name={} \
-        --qf_name={}
+        --qf_name={} \
         --learning_rate={} \
+        --gamma={} \
         --threshold_c={} \
         --weight_penalty={} \
         --weight_R={}" \
@@ -62,6 +63,12 @@ learning_rate = [
     0.0005,
 ]
 
+gamma = [
+    0.99,
+    0.95,
+    0.90
+]
+
 threshold_c = [
     0.1,
     0.5,
@@ -69,7 +76,6 @@ threshold_c = [
 ]
 
 weight_penalty = [
-    0.1,
     0.5,
 ]
 
@@ -78,16 +84,17 @@ weight_R = [
 ]
 
 # run Bayesian DQN
-# 3x3x3x2 = 54
+# 3x3x3x3
 for e_i in env_name:
     for d_i in dataset_type:
         for lr_i in learning_rate:
-            for t_i in threshold_c:
-                for wp_i in weight_penalty:
-                    for wR_i in weight_R:
-                        one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(wp_i), str(wR_i))
-                        #print(one_command)
-                        os.system(one_command)
+            for g_i in gamma:
+                for t_i in threshold_c:
+                    for wp_i in weight_penalty:
+                        for wR_i in weight_R:
+                            one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
+                            #print(one_command)
+                            os.system(one_command)
 
 
 # RUN CQL
@@ -95,6 +102,6 @@ for e_i in env_name:
 for e_i in env_name:
     for d_i in dataset_type:
         for lr_i in learning_rate:
-            one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'cql', 'none', str(lr_i), 0,0, 0.0, 0.0)
+            one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'cql', 'none', str(lr_i), 0,0, 0.9, 0.0, 0.0)
             #print(one_command)
             os.system(one_command)

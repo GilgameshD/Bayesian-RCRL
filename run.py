@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-11 12:26:13
+LastEditTime: 2022-10-14 11:01:03
 Description: 
 '''
 
@@ -32,7 +32,7 @@ parser.add_argument('--env_type', type=str, default='atari', help='atari or gym'
 
 parser.add_argument('--model_name', type=str, default='bayes', help='[dqn, cql, bayes, bc')
 parser.add_argument('--qf_name', type=str, default='bayes', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='mixed', help='[mixed, medium, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
@@ -51,6 +51,9 @@ parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of o
 
 # Bayesian Q parameters
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
+parser.add_argument('-vmin', '--vmin', type=float, default=0, help='lower bound of value function')
+parser.add_argument('-vmax', '--vmax', type=float, default=10, help='upper bound of value function')
+parser.add_argument('-ga', '--gamma', type=float, default=0.95, help='reward discount')
 parser.add_argument('-wp', '--weight_penalty', type=float, default=0.5, help='weight of action L2 penalty for loss A')
 parser.add_argument('-wR', '--weight_R', type=float, default=20.0, help='weight of loss R')
 parser.add_argument('-nq', '--n_quantiles', type=int, default=51, help='number of quantile for C51 q-value')
@@ -89,7 +92,12 @@ Model = model_list[args.model_name]
 # select q function
 qf_list = {
     'mean': MeanQFunctionFactory(n_quantiles=args.n_quantiles),
-    'bayes': BayesianQFunctionFactory(n_quantiles=args.n_quantiles, weight_penalty=args.weight_penalty, weight_R=args.weight_R),
+    'bayes': BayesianQFunctionFactory(
+        n_quantiles=args.n_quantiles, 
+        Vmin=args.vmin,
+        Vmax=args.vmax,
+        weight_penalty=args.weight_penalty, 
+        weight_R=args.weight_R),
     'qr': QRQFunctionFactory(n_quantiles=args.n_quantiles),
     'iqn': IQNQFunctionFactory(n_quantiles=args.n_quantiles),
     'fqf': FQFQFunctionFactory(n_quantiles=args.n_quantiles),
@@ -123,6 +131,7 @@ config = {
     'wR': args.weight_R,
     'be': args.beta_epoch,
     'ne': args.n_epochs,
+    'ga': args.gamma,
 }
 group_name = ''.join([k_i + '_' + str(config[k_i]) + '_' for k_i in config.keys()])
 def wandb_callback(algo, epoch, total_step, data_dict):
@@ -164,6 +173,7 @@ for t_i in range(len(seed_list)):
         encoder_factory=encoder,
         scaler=scaler,
         alpha=args.alpha,
+        gamma=args.gamma,
         threshold_c=args.threshold_c,
         use_gpu=True,
     )

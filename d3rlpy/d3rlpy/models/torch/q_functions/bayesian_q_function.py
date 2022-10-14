@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-07 18:48:25
+LastEditTime: 2022-10-13 16:08:45
 Description: 
 '''
 
@@ -27,7 +27,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
     _n_quantiles: int
     _fc: nn.Linear
 
-    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int, weight_penalty: float, weight_R: float):
+    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int, Vmin: float, Vmax: float, weight_penalty: float, weight_R: float):
         super().__init__()
         self._encoder = encoder
         self._action_size = action_size
@@ -44,8 +44,8 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         self.weight_R = weight_R
 
         # for C51
-        self.Vmin = -10
-        self.Vmax = 10
+        self.Vmin = Vmin
+        self.Vmax = Vmax
         self.atoms = torch.linspace(self.Vmin, self.Vmax, self._n_quantiles, device=self.device)
         self.delta_atom = float(self.Vmax - self.Vmin) / float(self._n_quantiles - 1)
 
@@ -55,7 +55,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         return h.view(-1, self._action_size, self._n_quantiles)
 
     def _compute_R_dist(self, logits_a_and_R: torch.Tensor) -> list:
-        # log p(a|s) = log sum_{R} exp log p(a, R|s)
+        # log p(a|s) = log sum_{R} exp [log p(a, R|s)]
         logits_a = torch.logsumexp(logits_a_and_R, dim=2)
 
         # log p(a|s)= log sum_{R} p(a, R|s) DONT USE THIS UNSTABLE IMPLEMENTATION
