@@ -23,7 +23,8 @@ RUN /bin/bash -c "mkdir user; cd user"
 RUN curl -LO http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     && bash Miniconda3-latest-Linux-x86_64.sh -p ./miniconda -b
 RUN rm ./Miniconda3-latest-Linux-x86_64.sh
-ENV PATH=/user/miniconda/bin:${PATH}
+ENV PATH=/home/user/miniconda/bin:${PATH}
+RUN source /home/user/.bashrc
 
 # Create the conda env
 RUN conda create -n bayesian_dqn python=3.8
@@ -33,5 +34,5 @@ ENV PATH=/user/miniconda/envs/bayesian_dqn/bin:${PATH}
 RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # run setup.sh
-RUN /bin/bash -c "conda init bash; conda activate bayesian_dqn; cd Bayesian-DQN"
+RUN /bin/bash -c "conda activate bayesian_dqn; cd Bayesian-DQN"
 RUN /bin/bash -c "chmod 777 ./setup.sh; ./setup.sh"
