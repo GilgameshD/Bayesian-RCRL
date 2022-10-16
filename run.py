@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-14 11:01:03
+LastEditTime: 2022-10-16 13:14:18
 Description: 
 '''
 
@@ -27,11 +27,12 @@ from d3rlpy.models.q_functions import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
-parser.add_argument('--env_name', type=str, default='breakout', help='[cartpole, breakout, pong]')
+parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/mnt/data1/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
+parser.add_argument('--env_name', type=str, default='seaquest', help='[cartpole, breakout, pong, seaquest]')
 parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
 
-parser.add_argument('--model_name', type=str, default='bayes', help='[dqn, cql, bayes, bc')
-parser.add_argument('--qf_name', type=str, default='bayes', help='[mean, c51, qr, iqn, fqf, bayes, none')
+parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
+parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
 parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert]')
 
 # beta policy model
@@ -51,12 +52,12 @@ parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of o
 
 # Bayesian Q parameters
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
-parser.add_argument('-vmin', '--vmin', type=float, default=0, help='lower bound of value function')
+parser.add_argument('-nq', '--n_quantiles', type=int, default=51, help='number of quantile for C51 q-value')
+parser.add_argument('-vmin', '--vmin', type=float, default=-10, help='lower bound of value function')
 parser.add_argument('-vmax', '--vmax', type=float, default=10, help='upper bound of value function')
 parser.add_argument('-ga', '--gamma', type=float, default=0.95, help='reward discount')
 parser.add_argument('-wp', '--weight_penalty', type=float, default=0.5, help='weight of action L2 penalty for loss A')
 parser.add_argument('-wR', '--weight_R', type=float, default=20.0, help='weight of loss R')
-parser.add_argument('-nq', '--n_quantiles', type=int, default=51, help='number of quantile for C51 q-value')
 parser.add_argument('-tui', '--target_update_interval', type=int, default=8000, help='target update interval for q learning')
 
 # CQL parameters 
@@ -68,6 +69,7 @@ args = parser.parse_args()
 # process some parameters
 project = 'bayesian-'+args.env_name+'-sweep'
 beta_model_dir = os.path.join(args.beta_model_base, args.env_name, args.dataset_type)
+os.environ['D4RL_DATASET_DIR'] = args.d4rl_dataset_dir
 dataset, env = d3rlpy.datasets.get_atari(args.env_name+'-more-'+args.dataset_type+'-v0')
 if args.env_type == 'atari':
     scaler = 'pixel'

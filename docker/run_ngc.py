@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-13 14:20:46
+LastEditTime: 2022-10-16 13:16:36
 Description: 
 '''
 
@@ -20,6 +20,7 @@ command = """ngc batch run \
     --commandline "python3 /workspace/Bayesian-DQN/run.py \
         --wandb_dir={} \
         --beta_model_base={} \
+        --d4rl_dataset_dir={} \
         --env_name={} \
         --dataset_type={} \
         --model_name={} \
@@ -40,11 +41,12 @@ command = """ngc batch run \
 """
 
 
-# save dir
+# save directories
 wandb_dir = './wandb'
 beta_model_base = './model'
+d4rl_dataset_dir = './dataset'
 
-# environment
+# environment name
 env_name = [
     'breakout'
 ]
@@ -53,7 +55,6 @@ dataset_type = [
     'medium',
     'mixed'
 ]
-
 
 
 # parameters of Bayesian-DQN
@@ -92,16 +93,14 @@ for e_i in env_name:
                 for t_i in threshold_c:
                     for wp_i in weight_penalty:
                         for wR_i in weight_R:
-                            one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
+                            one_command = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
                             #print(one_command)
                             os.system(one_command)
 
-
-# RUN CQL
-# 3x3 = 9
+# run BC
 for e_i in env_name:
     for d_i in dataset_type:
         for lr_i in learning_rate:
-            one_command = command.format(wandb_dir, beta_model_base, e_i, d_i, 'cql', 'none', str(lr_i), 0,0, 0.9, 0.0, 0.0)
+            one_command = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bc', 'none', str(lr_i), 0,0, 0.0, 0.0, 0.0)
             #print(one_command)
             os.system(one_command)
