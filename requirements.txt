@@ -4,4 +4,5 @@ ale-py==0.7.5
 torch==1.11.0
 numpy>=1.22
 tqdm
+matplotlib
 wandb
