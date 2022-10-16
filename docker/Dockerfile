@@ -7,16 +7,20 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Setup basic packages 
 RUN apt-get update
 RUN apt-get install -y htop screen psmisc python3.8 python3-pip python-is-python3 git wget unzip g++ cmake 
-# for opencv
 RUN apt-get install -y ffmpeg libsm6 libxext6 
 
-# download code from github
-WORKDIR /workspace
-RUN git clone https://github.com/GilgameshD/Bayesian-DQN.git
+# install python packages
+RUN pip install gym[accept-rom-license]==0.23.1
+RUN pip install Cython
+RUN pip install ale-py==0.7.5
+RUN pip install torch==1.11.0
+RUN pip install numpy>=1.22
+RUN pip install tqdm
+RUN pip install matplotlib
+RUN pip install wandb
 
-# run setup.sh
+# set workdir
 WORKDIR /workspace/Bayesian-DQN
-RUN sh ./setup.sh
 
 # setup wandb
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-16 13:14:18
+LastEditTime: 2022-10-16 18:39:13
 Description: 
 '''
 
@@ -27,13 +27,13 @@ from d3rlpy.models.q_functions import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
-parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/mnt/data1/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='seaquest', help='[cartpole, breakout, pong, seaquest]')
+parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/home/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
+parser.add_argument('--env_name', type=str, default='qbert', help='[cartpole, breakout, pong, seaquest, qbert]')
 parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
 
 parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='expert', help='[mixed, medium, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
@@ -46,7 +46,7 @@ parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch siz
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.00025, help='learning rate')
 
 # test parameters
-parser.add_argument('-te', '--test_epsilon', type=float, default=0.01, help='use epsilon greedy during testing stage')
+parser.add_argument('-te', '--test_epsilon', type=float, default=0.01, help='epsilon of testing stage')
 parser.add_argument('-esi', '--eval_step_interval', type=int, default=10000, help='interval of step of calling evaluation')
 parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of online evaluation trails')
 
@@ -99,7 +99,8 @@ qf_list = {
         Vmin=args.vmin,
         Vmax=args.vmax,
         weight_penalty=args.weight_penalty, 
-        weight_R=args.weight_R),
+        weight_R=args.weight_R
+    ),
     'qr': QRQFunctionFactory(n_quantiles=args.n_quantiles),
     'iqn': IQNQFunctionFactory(n_quantiles=args.n_quantiles),
     'fqf': FQFQFunctionFactory(n_quantiles=args.n_quantiles),

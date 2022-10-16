@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-16 13:16:36
+LastEditTime: 2022-10-16 19:58:26
 Description: 
 '''
 
@@ -83,6 +83,16 @@ weight_penalty = [
 weight_R = [
     20.0,
 ]
+
+
+# install local packages
+pip_install_command = "\
+    cd /workspace/Bayesian-DQN/d3rlpy && \
+    pip install -e . && \
+    cd /workspace/Bayesian-DQN/d4rl-atari && \
+    pip install -e . && \
+    cd /workspace/Bayesian-DQN"
+os.system(pip_install_command)
 
 # run Bayesian DQN
 # 3x3x3x3
