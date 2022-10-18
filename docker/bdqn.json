@@ -1,0 +1,40 @@
+{
+    "userLabels":[
+        
+    ],
+    "aceId":257,
+    "aceInstance":"dgx1v.16g.4.norm",
+    "dockerImageName":"nvidian/nvr-av/bdqn:0.1",
+    "aceName":"nv-us-west-2",
+    "systemLabels":[
+        
+    ],
+    "datasetMounts":[
+        {
+            "containerMountPoint":"/workspace/data",
+            "id":107377
+        }
+    ],
+    "workspaceMounts":[
+        {
+            "containerMountPoint":"/workspace",
+            "id":"BDQN",
+            "mountMode":"RW"
+        }
+    ],
+    "replicaCount":1,
+    "publishedContainerPorts":[
+        8888 
+    ],
+    "reservedLabels":[
+        
+    ],
+    "name":"ml-model.DQN",
+    "command":"cd /workspace/Bayesian-DQN/d3rlpy && pip install -e . && cd /workspace/Bayesian-DQN/d4rl-atari && pip install -e . && cd /workspace/Bayesian-DQN && python3 run.py --wandb_dir=/results/wandb --beta_model_base=/results --d4rl_dataset_dir=/workspace/data",
+    "runPolicy":{
+        "minTimesliceSeconds":1,
+        "totalRuntimeSeconds":409200,
+        "preemptClass":"RUNONCE"
+    },
+    "resultContainerMountPoint":"/results"
+}

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-16 18:39:13
+LastEditTime: 2022-10-17 21:29:37
 Description: 
 '''
 
@@ -28,12 +28,12 @@ from d3rlpy.models.q_functions import (
 parser = argparse.ArgumentParser()
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/home/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='qbert', help='[cartpole, breakout, pong, seaquest, qbert]')
+parser.add_argument('--env_name', type=str, default='breakout', help='[cartpole, breakout, pong, seaquest, qbert, asterix]')
 parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
 
 parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='expert', help='[mixed, medium, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
