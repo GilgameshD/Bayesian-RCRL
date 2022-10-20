@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-18 16:21:37
+LastEditTime: 2022-10-20 10:30:07
 Description: 
 '''
 
@@ -36,7 +36,7 @@ command = """ \
 # save directories
 wandb_dir = '/results'
 beta_model_base = '/results'
-d4rl_dataset_dir = '/workspace'
+d4rl_dataset_dir = '/workspace/data'
 
 # environment name
 env_name = [
@@ -80,7 +80,6 @@ weight_R = [
 with open('base.json', 'r') as fp:  
     base_json = json.load(fp)
 
-command_list = []
 
 # run Bayesian DQN
 # 1x1x3x3x3
@@ -95,11 +94,5 @@ for e_i in env_name:
                         for wR_i in weight_R:
                             job_name = e_i + '_' + d_i + '_' + model_name + '_' + q_name + '_' + str(lr_i) + '_' + str(t_i) + '_' + str(g_i) + '_' + str(wp_i) + '_' + str(wR_i) + '.json'
                             base_json['command'] = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
-                            command_list.append(copy.deepcopy(base_json))
-
-# make groups
-num_in_group = 4
-for c_i in range(0, len(command_list), num_in_group):
-    
-    with open(job_name, 'w') as fp:  
-        json.dump(base_json, fp, indent=4)
+                            with open(job_name, 'w') as fp:  
+                                json.dump(base_json, fp, indent=4)
