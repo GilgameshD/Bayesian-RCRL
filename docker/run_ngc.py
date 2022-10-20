@@ -2,22 +2,22 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-16 19:58:26
+LastEditTime: 2022-10-18 16:21:37
 Description: 
 '''
 
+import copy
 import os
+import json
 
 
-command = """ngc batch run \
-    --name "ml-model.decision-transformer" \
-    --priority NORMAL \
-    --preempt RUNONCE \
-    --min-timeslice 1s \
-    --total-runtime 259200s \
-    --ace nv-us-west-2 \
-    --instance dgx1v.32g.1.norm \
-    --commandline "python3 /workspace/Bayesian-DQN/run.py \
+command = """ \
+    cd /workspace/Bayesian-DQN/d3rlpy && \
+    pip install -e . && \
+    cd /workspace/Bayesian-DQN/d4rl-atari && \
+    pip install -e . && \
+    cd /workspace/Bayesian-DQN \
+    python3 run.py \
         --wandb_dir={} \
         --beta_model_base={} \
         --d4rl_dataset_dir={} \
@@ -29,31 +29,22 @@ command = """ngc batch run \
         --gamma={} \
         --threshold_c={} \
         --weight_penalty={} \
-        --weight_R={}" \
-    --result /results \
-    --image "nvidian/nvr-av/dedt-img:2.0" \
-    --org nvidian \
-    --team nvr-av \
-    --datasetid 107377:/workspace/data \
-    --workspace i1ss1gHKSNCBu46DQUXBYw:/workspace:RW \
-    --port 8888 \
-    --order 50
+        --weight_R={}"
 """
 
 
 # save directories
-wandb_dir = './wandb'
-beta_model_base = './model'
-d4rl_dataset_dir = './dataset'
+wandb_dir = '/results'
+beta_model_base = '/results'
+d4rl_dataset_dir = '/workspace'
 
 # environment name
 env_name = [
     'breakout'
 ]
+# 10, 20, 30, 40, 50
 dataset_type = [
-    'expert',
-    'medium',
-    'mixed'
+    'medium'
 ]
 
 
@@ -85,17 +76,16 @@ weight_R = [
 ]
 
 
-# install local packages
-pip_install_command = "\
-    cd /workspace/Bayesian-DQN/d3rlpy && \
-    pip install -e . && \
-    cd /workspace/Bayesian-DQN/d4rl-atari && \
-    pip install -e . && \
-    cd /workspace/Bayesian-DQN"
-os.system(pip_install_command)
+# load template json file
+with open('base.json', 'r') as fp:  
+    base_json = json.load(fp)
+
+command_list = []
 
 # run Bayesian DQN
-# 3x3x3x3
+# 1x1x3x3x3
+model_name = 'bayes'
+q_name = 'bayes'
 for e_i in env_name:
     for d_i in dataset_type:
         for lr_i in learning_rate:
@@ -103,14 +93,13 @@ for e_i in env_name:
                 for t_i in threshold_c:
                     for wp_i in weight_penalty:
                         for wR_i in weight_R:
-                            one_command = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
-                            #print(one_command)
-                            os.system(one_command)
+                            job_name = e_i + '_' + d_i + '_' + model_name + '_' + q_name + '_' + str(lr_i) + '_' + str(t_i) + '_' + str(g_i) + '_' + str(wp_i) + '_' + str(wR_i) + '.json'
+                            base_json['command'] = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
+                            command_list.append(copy.deepcopy(base_json))
 
-# run BC
-for e_i in env_name:
-    for d_i in dataset_type:
-        for lr_i in learning_rate:
-            one_command = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bc', 'none', str(lr_i), 0,0, 0.0, 0.0, 0.0)
-            #print(one_command)
-            os.system(one_command)
+# make groups
+num_in_group = 4
+for c_i in range(0, len(command_list), num_in_group):
+    
+    with open(job_name, 'w') as fp:  
+        json.dump(base_json, fp, indent=4)

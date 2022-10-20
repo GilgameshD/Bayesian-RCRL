@@ -5,6 +5,7 @@ import random
 import re
 from typing import List, Tuple
 from urllib import request
+import pickle as pkl
 
 import gym
 import numpy as np
@@ -99,7 +100,7 @@ def get_pendulum(dataset_type: str = "replay") -> Tuple[MDPDataset, gym.Env]:
     return dataset, env
 
 
-def get_atari(env_name: str) -> Tuple[MDPDataset, gym.Env]:
+def get_atari(env_name: str, dataset_path: str = None) -> Tuple[MDPDataset, gym.Env]:
     """Returns atari dataset and envrironment.
 
     The dataset is provided through d4rl-atari. See more details including
@@ -125,7 +126,21 @@ def get_atari(env_name: str) -> Tuple[MDPDataset, gym.Env]:
         import d4rl_atari  # type: ignore
 
         env = ChannelFirst(gym.make(env_name))
-        dataset = MDPDataset(discrete_action=True, **env.get_dataset())
+
+        data_path = os.path.join(dataset_path, env_name)
+        if not os.path.exists(data_path):
+            print('load data from raw dataset...')
+            dataset = MDPDataset(discrete_action=True, **env.get_dataset())
+            if dataset_path is not None:
+                with open(data_path, 'wb') as fp:
+                    pkl.dump(dataset, fp)
+                #dataset.dump(data_path)
+        else:
+            print('load data from processed data of {}...'.format(data_path))
+            with open(data_path, 'rb') as fp:
+                dataset = pkl.load(fp)
+            #dataset = MDPDataset.load(data_path)
+
         return dataset, env
     except ImportError as e:
         raise ImportError(

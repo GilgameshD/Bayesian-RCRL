@@ -30,7 +30,7 @@
         
     ],
     "name":"ml-model.DQN",
-    "command":"cd /workspace/Bayesian-DQN/d3rlpy && pip install -e . && cd /workspace/Bayesian-DQN/d4rl-atari && pip install -e . && cd /workspace/Bayesian-DQN && python3 run.py --wandb_dir=/results/wandb --beta_model_base=/results --d4rl_dataset_dir=/workspace/data",
+    "command":"TODO",
     "runPolicy":{
         "minTimesliceSeconds":1,
         "totalRuntimeSeconds":409200,

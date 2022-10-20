@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-17 21:29:37
+LastEditTime: 2022-10-19 21:35:44
 Description: 
 '''
 
@@ -27,8 +27,8 @@ from d3rlpy.models.q_functions import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
-parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/home/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='breakout', help='[cartpole, breakout, pong, seaquest, qbert, asterix]')
+parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/mnt/data1/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
+parser.add_argument('--env_name', type=str, default='seaquest', help='[cartpole, breakout, pong, seaquest, qbert, asterix]')
 parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
 
 parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
@@ -41,9 +41,9 @@ parser.add_argument('-be', '--beta_epoch', type=float, default=2, help='number o
 parser.add_argument('-blr', '--beta_learning_rate', type=float, default=0.00025, help='learning rate of beta policy model')
 
 # training parameters
-parser.add_argument('-ne', '--n_epochs', type=int, default=15, help='number of training epoch')
+parser.add_argument('-ne', '--n_epochs', type=int, default=50, help='number of training epoch')
 parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch size')
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.00025, help='learning rate')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.0002, help='learning rate')
 
 # test parameters
 parser.add_argument('-te', '--test_epsilon', type=float, default=0.01, help='epsilon of testing stage')
@@ -52,12 +52,13 @@ parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of o
 
 # Bayesian Q parameters
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
-parser.add_argument('-nq', '--n_quantiles', type=int, default=51, help='number of quantile for C51 q-value')
+parser.add_argument('-nq', '--n_quantiles', type=int, default=32, help='number of quantile for C51 q-value')
 parser.add_argument('-vmin', '--vmin', type=float, default=-10, help='lower bound of value function')
 parser.add_argument('-vmax', '--vmax', type=float, default=10, help='upper bound of value function')
 parser.add_argument('-ga', '--gamma', type=float, default=0.95, help='reward discount')
 parser.add_argument('-wp', '--weight_penalty', type=float, default=0.5, help='weight of action L2 penalty for loss A')
 parser.add_argument('-wR', '--weight_R', type=float, default=20.0, help='weight of loss R')
+parser.add_argument('-wA', '--weight_A', type=float, default=1.0, help='weight of loss A')
 parser.add_argument('-tui', '--target_update_interval', type=int, default=8000, help='target update interval for q learning')
 
 # CQL parameters 
@@ -65,12 +66,21 @@ parser.add_argument('-a', '--alpha', type=float, default=4.0, help='weight of co
 
 args = parser.parse_args()
 
+"""
+    Breakout:
+        blr = 0.00025
+        lr = 0.00025
+        gamma = 0.95
+        vmin = 0
+        weight_penalty = 0.5
+        weight_R = 20.0
+"""
 
 # process some parameters
 project = 'bayesian-'+args.env_name+'-sweep'
 beta_model_dir = os.path.join(args.beta_model_base, args.env_name, args.dataset_type)
 os.environ['D4RL_DATASET_DIR'] = args.d4rl_dataset_dir
-dataset, env = d3rlpy.datasets.get_atari(args.env_name+'-more-'+args.dataset_type+'-v0')
+dataset, env = d3rlpy.datasets.get_atari(args.env_name+'-more-'+args.dataset_type+'-v0', args.d4rl_dataset_dir)
 if args.env_type == 'atari':
     scaler = 'pixel'
     encoder = 'pixel'
@@ -99,7 +109,8 @@ qf_list = {
         Vmin=args.vmin,
         Vmax=args.vmax,
         weight_penalty=args.weight_penalty, 
-        weight_R=args.weight_R
+        weight_R=args.weight_R,
+        weight_A=args.weight_A
     ),
     'qr': QRQFunctionFactory(n_quantiles=args.n_quantiles),
     'iqn': IQNQFunctionFactory(n_quantiles=args.n_quantiles),
@@ -132,6 +143,7 @@ config = {
     'te': args.test_epsilon,
     'wp': args.weight_penalty,
     'wR': args.weight_R,
+    'wA': args.weight_A,
     'be': args.beta_epoch,
     'ne': args.n_epochs,
     'ga': args.gamma,

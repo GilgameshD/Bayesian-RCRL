@@ -138,14 +138,6 @@ class OfflineEnv(gym.Env):
             'terminals': terminals
         }
 
-        '''
-        idx = np.where(terminals == 1)[0]
-        print(idx)
-        for i in range(len(idx)-1):
-            sum_reward = np.sum(rewards[idx[i]:idx[i+1]])
-            print(idx[i], idx[i+1], sum_reward)
-        '''
-
         # print average reward
         sum_reward = np.sum(rewards)
         num_traj = np.sum(terminals)

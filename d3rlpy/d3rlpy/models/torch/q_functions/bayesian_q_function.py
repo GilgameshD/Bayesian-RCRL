@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-13 16:08:45
+LastEditTime: 2022-10-18 21:45:04
 Description: 
 '''
 
@@ -27,7 +27,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
     _n_quantiles: int
     _fc: nn.Linear
 
-    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int, Vmin: float, Vmax: float, weight_penalty: float, weight_R: float):
+    def __init__(self, encoder: Encoder, action_size: int, n_quantiles: int, Vmin: float, Vmax: float, weight_penalty: float, weight_R: float, weight_A: float):
         super().__init__()
         self._encoder = encoder
         self._action_size = action_size
@@ -42,6 +42,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         # weights for loss
         self.weight_penalty = weight_penalty
         self.weight_R = weight_R
+        self.weight_A = weight_A
 
         # for C51
         self.Vmin = Vmin
@@ -121,7 +122,7 @@ class DiscreteBayesianQFunction(DiscreteQFunction, nn.Module):  # type: ignore
         #loss_A = F.nll_loss(logits_a, actions.reshape(-1), reduction='none') + action_penalty
         loss_A = F.cross_entropy(logits_a, actions.reshape(-1), reduction='none') + action_penalty
 
-        loss = loss_A + self.weight_R * loss_R 
+        loss = self.weight_A * loss_A + self.weight_R * loss_R 
         return compute_reduce(loss, reduction)
 
     def compute_target(self, observations_next: torch.Tensor, log_probs_next_action: Optional[torch.Tensor] = None) -> torch.Tensor:
