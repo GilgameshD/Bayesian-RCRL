@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-10 23:23:04
+LastEditTime: 2022-10-21 23:27:04
 Description: 
 '''
 
@@ -44,6 +44,7 @@ class BayesianDiscreteDQN(DQN):
         n_critics: int = 1,
         target_update_interval: int = 8000,
         threshold_c: float = 1.0,
+        beta_weight_penalty: float = 0.5,
         use_gpu: UseGPUArg = False,
         scaler: ScalerArg = None,
         reward_scaler: RewardScalerArg = None,
@@ -77,6 +78,7 @@ class BayesianDiscreteDQN(DQN):
             n_frames=n_frames,
             learning_rate=beta_learning_rate,
             q_func_factory=None,
+            beta=beta_weight_penalty,
             encoder_factory=encoder_factory,
             scaler=scaler,
             use_gpu=use_gpu,

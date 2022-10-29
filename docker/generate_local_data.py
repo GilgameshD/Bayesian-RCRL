@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-20 10:20:22
+LastEditTime: 2022-10-22 12:12:48
 Description: 
 '''
 
@@ -12,6 +12,7 @@ import os
 import d3rlpy
 
 
+# used for modified d3rlpy
 parser = argparse.ArgumentParser()
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/mnt/data1/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
 parser.add_argument('--env_name', type=str, default='breakout', help='[breakout, pong, seaquest, qbert, asterix]')

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-20 10:30:07
+LastEditTime: 2022-10-29 13:05:03
 Description: 
 '''
 
@@ -16,7 +16,7 @@ command = """ \
     pip install -e . && \
     cd /workspace/Bayesian-DQN/d4rl-atari && \
     pip install -e . && \
-    cd /workspace/Bayesian-DQN \
+    cd /workspace/Bayesian-DQN && \
     python3 run.py \
         --wandb_dir={} \
         --beta_model_base={} \

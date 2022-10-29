@@ -1,3 +1,11 @@
+'''
+Author: Wenhao Ding
+Email: wenhaod@andrew.cmu.edu
+Date: 2022-09-09 15:13:43
+LastEditTime: 2022-10-21 14:06:14
+Description: 
+'''
+
 import numpy as np
 import gym
 import cv2
@@ -24,8 +32,7 @@ class AtariEnv(gym.Env):
         env_id = '{}NoFrameskip-v{}'.format(game, 0 if sticky_action else 4)
 
         # use official atari wrapper
-        env = AtariPreprocessing(gym.make(env_id),
-                                 terminal_on_life_loss=terminal_on_life_loss)
+        env = AtariPreprocessing(gym.make(env_id), terminal_on_life_loss=terminal_on_life_loss)
 
         if stack:
             env = FrameStack(env, num_stack=4)
