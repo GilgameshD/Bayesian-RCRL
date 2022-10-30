@@ -128,6 +128,9 @@ def get_atari(env_name: str, dataset_path: str = None) -> Tuple[MDPDataset, gym.
         env = ChannelFirst(gym.make(env_name))
 
         data_path = os.path.join(dataset_path, env_name)
+        print('**********************************************')
+        print(data_path)
+        print('**********************************************')
         if not os.path.exists(data_path):
             print('load data from raw dataset...')
             dataset = MDPDataset(discrete_action=True, **env.get_dataset())
