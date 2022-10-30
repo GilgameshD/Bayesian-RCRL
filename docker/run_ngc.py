@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-30 11:53:27
+LastEditTime: 2022-10-30 11:57:58
 Description: 
 '''
 
@@ -97,7 +97,7 @@ for e_i in env_name:
                 for t_i in threshold_c:
                     for wp_i in weight_penalty:
                         for wR_i in weight_R:
-                            job_name = e_i + '_' + d_i + '_' + model_name + '_' + q_name + '_' + str(lr_i) + '_' + str(t_i) + '_' + str(g_i) + '_' + str(wp_i) + '_' + str(wR_i) + '.json'
-                            base_json['command'] = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(t_i), str(g_i), str(wp_i), str(wR_i))
+                            job_name = e_i + '_' + d_i + '_' + model_name + '_' + q_name + '_' + str(lr_i) + '_' + str(g_i) + '_' + str(t_i) + '_' + str(wp_i) + '_' + str(wR_i) + '.json'
+                            base_json['command'] = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(g_i), str(t_i), str(wp_i), str(wR_i))
                             with open(job_name, 'w') as fp:  
                                 json.dump(base_json, fp, indent=4)
