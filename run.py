@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-27 13:23:32
+LastEditTime: 2022-10-30 15:42:49
 Description: 
 '''
 
@@ -38,14 +38,14 @@ parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
-parser.add_argument('-be', '--beta_epoch', type=float, default=150, help='number of epoch for training beta policy (using BC)')
+parser.add_argument('-be', '--beta_epoch', type=int, default=150, help='number of epoch for training beta policy (using BC)')
 parser.add_argument('-blr', '--beta_learning_rate', type=float, default=0.0001, help='learning rate of beta policy model')
 parser.add_argument('-bwp', '--beta_weight_penalty', type=float, default=0.0, help='weight of action L2 penalty for beta policy (beta of BC)')
 
 # training parameters
 parser.add_argument('-ne', '--n_epochs', type=int, default=200, help='number of training epoch')
 parser.add_argument('-bs', '--batch_size', type=int, default=128, help='batch size')
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='learning rate')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.0001, help='learning rate')
 
 # test parameters
 parser.add_argument('-te', '--test_epsilon', type=float, default=0.0, help='epsilon in testing stage')
