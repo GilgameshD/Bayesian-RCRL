@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-30 11:57:58
+LastEditTime: 2022-10-30 15:06:58
 Description: 
 '''
 
@@ -34,7 +34,8 @@ command = """ \
         --batch_size=32 \
         --beta_epoch=2 \
         --beta_learning_rate=0.00025 \
-        --target_update_interval=8000
+        --target_update_interval=8000 \
+        --test_epsilon=0.01
 """
 
 
@@ -85,11 +86,15 @@ weight_R = [
 with open('base.json', 'r') as fp:  
     base_json = json.load(fp)
 
+# create a new folder
+folder_name = './json'
+os.mkdir(folder_name)
 
 # run Bayesian DQN
 # 1x1x3x3x3
 model_name = 'bayes'
 q_name = 'bayes'
+count = 0
 for e_i in env_name:
     for d_i in dataset_type:
         for lr_i in learning_rate:
@@ -97,7 +102,21 @@ for e_i in env_name:
                 for t_i in threshold_c:
                     for wp_i in weight_penalty:
                         for wR_i in weight_R:
-                            job_name = e_i + '_' + d_i + '_' + model_name + '_' + q_name + '_' + str(lr_i) + '_' + str(g_i) + '_' + str(t_i) + '_' + str(wp_i) + '_' + str(wR_i) + '.json'
-                            base_json['command'] = command.format(wandb_dir, beta_model_base, d4rl_dataset_dir, e_i, d_i, 'bayes', 'bayes', str(lr_i), str(g_i), str(t_i), str(wp_i), str(wR_i))
+                            job_name = folder_name + '/' + str(count) + '.json'
+                            count += 1
+                            base_json['command'] = command.format(
+                                wandb_dir, 
+                                beta_model_base, 
+                                d4rl_dataset_dir, 
+                                e_i, 
+                                d_i, 
+                                'bayes', 
+                                'bayes', 
+                                str(lr_i), 
+                                str(g_i), 
+                                str(t_i), 
+                                str(wp_i), 
+                                str(wR_i)
+                            )
                             with open(job_name, 'w') as fp:  
                                 json.dump(base_json, fp, indent=4)
