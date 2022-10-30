@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-14 11:07:42
+LastEditTime: 2022-10-22 21:23:55
 Description: 
 '''
 
@@ -116,37 +116,34 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         # p(a |R > c) = \sum_{R} p(a, R|R > c)
         p_a_cond_c = p_a_and_R_cond_c.sum(dim=2)
 
-        '''
+        #'''
         if self.counter % 10000 == 0:
             print(idx)
             max_value = torch.max(p_a_and_R).detach().cpu().numpy()
-            plt.figure(figsize=(8, 8))
-            plt.subplot(4, 1, 1)
-            plt.ylim(0, max_value)
-            plt.bar(range(len(p_a_and_R[0, 0])), p_a_and_R.detach().cpu().numpy()[0, 0])
-            plt.subplot(4, 1, 2)
-            plt.ylim(0, max_value)
-            plt.bar(range(len(p_a_and_R[0, 1])), p_a_and_R.detach().cpu().numpy()[0, 1])
-            plt.subplot(4, 1, 3)
-            plt.bar(range(len(p_a_and_R[0, 2])), p_a_and_R.detach().cpu().numpy()[0, 2])
-            plt.ylim(0, max_value)
-            plt.subplot(4, 1, 4)
-            plt.bar(range(len(p_a_and_R[0, 3])), p_a_and_R.detach().cpu().numpy()[0, 3])
-            plt.ylim(0, max_value)
+            plt.figure(figsize=(12, 12))
+            action_dim = 18
+            for i in range(action_dim):
+                plt.subplot(action_dim, 1, i+1)
+                plt.ylim(0, max_value)
+                plt.bar(range(len(p_a_and_R[0, i])), p_a_and_R.detach().cpu().numpy()[0, i])
+
+            plt.tight_layout()
             plt.savefig('./plots/gamma_0_95/action_quantiles_'+str(self.counter)+'.png', dpi=200)
             plt.close('all')
 
             plt.figure(figsize=(3, 5))
             plt.imshow(p_a_and_R.detach().cpu().numpy()[0])
+            plt.tight_layout()
             plt.savefig('./plots/gamma_0_95/joint_distribution_'+str(self.counter)+'.png', dpi=200)
             plt.close('all')
 
             plt.figure(figsize=(5, 5))
             plt.imshow(p_a_and_R_cond_c.detach().cpu().numpy()[0])
+            plt.tight_layout()
             plt.savefig('./plots/gamma_0_95/p_a_and_R_cond_c_'+str(self.counter)+'.png', dpi=200)
             plt.close('all')
         self.counter += 1
-        '''
+        #'''
 
         # sample from p(a|R > c)
         #action = torch.distributions.Categorical(p_a_cond_c).sample()

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-29 15:39:47
+LastEditTime: 2022-10-30 11:53:27
 Description: 
 '''
 
@@ -29,7 +29,12 @@ command = """ \
         --gamma={} \
         --threshold_c={} \
         --weight_penalty={} \
-        --weight_R={}
+        --weight_R={} \
+        --n_epochs=20 \
+        --batch_size=32 \
+        --beta_epoch=2 \
+        --beta_learning_rate=0.00025 \
+        --target_update_interval=8000
 """
 
 

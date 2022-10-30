@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2022-10-19 21:35:44
+LastEditTime: 2022-10-27 13:23:32
 Description: 
 '''
 
@@ -28,38 +28,40 @@ from d3rlpy.models.q_functions import (
 parser = argparse.ArgumentParser()
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/mnt/data1/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/mnt/data1/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='seaquest', help='[cartpole, breakout, pong, seaquest, qbert, asterix]')
+parser.add_argument('--env_name', type=str, default='asterix', help='[cartpole, breakout, pong, seaquest, qbert, asterix]')
 parser.add_argument('--env_type', type=str, default='atari', help='atari or gym')
 
+# model selection
 parser.add_argument('--model_name', type=str, default='bc', help='[dqn, cql, bayes, bc')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
 parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
-parser.add_argument('-be', '--beta_epoch', type=float, default=2, help='number of epoch for training beta policy (using BC)')
-parser.add_argument('-blr', '--beta_learning_rate', type=float, default=0.00025, help='learning rate of beta policy model')
+parser.add_argument('-be', '--beta_epoch', type=float, default=150, help='number of epoch for training beta policy (using BC)')
+parser.add_argument('-blr', '--beta_learning_rate', type=float, default=0.0001, help='learning rate of beta policy model')
+parser.add_argument('-bwp', '--beta_weight_penalty', type=float, default=0.0, help='weight of action L2 penalty for beta policy (beta of BC)')
 
 # training parameters
-parser.add_argument('-ne', '--n_epochs', type=int, default=50, help='number of training epoch')
-parser.add_argument('-bs', '--batch_size', type=int, default=32, help='batch size')
-parser.add_argument('-lr', '--learning_rate', type=float, default=0.0002, help='learning rate')
+parser.add_argument('-ne', '--n_epochs', type=int, default=200, help='number of training epoch')
+parser.add_argument('-bs', '--batch_size', type=int, default=128, help='batch size')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, help='learning rate')
 
 # test parameters
-parser.add_argument('-te', '--test_epsilon', type=float, default=0.01, help='epsilon of testing stage')
+parser.add_argument('-te', '--test_epsilon', type=float, default=0.0, help='epsilon in testing stage')
 parser.add_argument('-esi', '--eval_step_interval', type=int, default=10000, help='interval of step of calling evaluation')
 parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of online evaluation trails')
 
 # Bayesian Q parameters
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
 parser.add_argument('-nq', '--n_quantiles', type=int, default=32, help='number of quantile for C51 q-value')
-parser.add_argument('-vmin', '--vmin', type=float, default=-10, help='lower bound of value function')
+parser.add_argument('-vmin', '--vmin', type=float, default=0, help='lower bound of value function')
 parser.add_argument('-vmax', '--vmax', type=float, default=10, help='upper bound of value function')
 parser.add_argument('-ga', '--gamma', type=float, default=0.95, help='reward discount')
-parser.add_argument('-wp', '--weight_penalty', type=float, default=0.5, help='weight of action L2 penalty for loss A')
+parser.add_argument('-wp', '--weight_penalty', type=float, default=0.0, help='weight of action L2 penalty for loss A')
 parser.add_argument('-wR', '--weight_R', type=float, default=20.0, help='weight of loss R')
 parser.add_argument('-wA', '--weight_A', type=float, default=1.0, help='weight of loss A')
-parser.add_argument('-tui', '--target_update_interval', type=int, default=8000, help='target update interval for q learning')
+parser.add_argument('-tui', '--target_update_interval', type=int, default=2000, help='target update interval for q learning')
 
 # CQL parameters 
 parser.add_argument('-a', '--alpha', type=float, default=4.0, help='weight of conservative loss in CQL')
@@ -67,13 +69,36 @@ parser.add_argument('-a', '--alpha', type=float, default=4.0, help='weight of co
 args = parser.parse_args()
 
 """
-    Breakout:
+    breakout:
+        test_epsilon = 0.01
         blr = 0.00025
+        batch_size = 32
         lr = 0.00025
         gamma = 0.95
         vmin = 0
+        vmax = 10
+        beta_epoch = 2
+        beta_weight_penalty = 0.5
+        n_quantiles = 51
         weight_penalty = 0.5
         weight_R = 20.0
+        weight_A = 1.0
+        target_update_interval = 8000
+    seaquest:
+        test_epsilon = 0.0
+        blr = 0.0001
+        batch_size = 128
+        lr = 0.0001
+        gamma = 0.95
+        vmin = 0
+        vmax = 10
+        n_quantiles = 32
+        beta_epoch = 150
+        beta_weight_penalty = 0.0
+        weight_penalty = 0.0
+        weight_R = 20.0
+        weight_A = 1.0
+        target_update_interval = 2000
 """
 
 # process some parameters
@@ -188,6 +213,8 @@ for t_i in range(len(seed_list)):
         encoder_factory=encoder,
         scaler=scaler,
         alpha=args.alpha,
+        beta=args.weight_penalty,                      # used for BC
+        beta_weight_penalty=args.beta_weight_penalty,  # used for beta policy
         gamma=args.gamma,
         threshold_c=args.threshold_c,
         use_gpu=True,
