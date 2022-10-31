@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2022-10-22 21:23:55
+LastEditTime: 2022-10-31 16:54:04
 Description: 
 '''
 
@@ -116,7 +116,7 @@ class BayesianDiscreteDQNImpl(DQNImpl):
         # p(a |R > c) = \sum_{R} p(a, R|R > c)
         p_a_cond_c = p_a_and_R_cond_c.sum(dim=2)
 
-        #'''
+        '''
         if self.counter % 10000 == 0:
             print(idx)
             max_value = torch.max(p_a_and_R).detach().cpu().numpy()
@@ -143,7 +143,7 @@ class BayesianDiscreteDQNImpl(DQNImpl):
             plt.savefig('./plots/gamma_0_95/p_a_and_R_cond_c_'+str(self.counter)+'.png', dpi=200)
             plt.close('all')
         self.counter += 1
-        #'''
+        '''
 
         # sample from p(a|R > c)
         #action = torch.distributions.Categorical(p_a_cond_c).sample()
