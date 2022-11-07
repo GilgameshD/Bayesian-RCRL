@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-10-30 15:06:58
+LastEditTime: 2022-11-06 19:10:37
 Description: 
 '''
 
@@ -88,7 +88,8 @@ with open('base.json', 'r') as fp:
 
 # create a new folder
 folder_name = './json'
-os.mkdir(folder_name)
+if not os.path.exists(folder_name):
+    os.mkdir(folder_name)
 
 # run Bayesian DQN
 # 1x1x3x3x3
