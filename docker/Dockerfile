@@ -19,8 +19,14 @@ RUN pip install tqdm
 RUN pip install matplotlib
 RUN pip install wandb
 
-# set workdir
-WORKDIR /workspace/Bayesian-DQN
+# clone code
+RUN cd ~ && git clone https://github.com/GilgameshD/Bayesian-DQN.git
+
+# install d3rlpy and d4rl
+RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl-atari && pip install -e .
 
 # setup wandb
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1
+
+RUN export HOME=$(pwd)
+WORKDIR $HOME

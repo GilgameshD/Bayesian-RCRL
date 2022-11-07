@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-11-06 19:10:37
+LastEditTime: 2022-11-07 13:38:20
 Description: 
 '''
 
@@ -12,11 +12,6 @@ import json
 
 
 command = """ \
-    cd /workspace/Bayesian-DQN/d3rlpy && \
-    pip install -e . && \
-    cd /workspace/Bayesian-DQN/d4rl-atari && \
-    pip install -e . && \
-    cd /workspace/Bayesian-DQN && \
     python3 run.py \
         --wandb_dir={} \
         --beta_model_base={} \
