@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2022-11-07 13:38:20
+LastEditTime: 2022-11-11 13:38:04
 Description: 
 '''
 
@@ -30,7 +30,8 @@ command = """ \
         --beta_epoch=2 \
         --beta_learning_rate=0.00025 \
         --target_update_interval=8000 \
-        --test_epsilon=0.01
+        --test_epsilon=0.01 \
+        --n_quantiles=32 \
 """
 
 
@@ -48,24 +49,26 @@ dataset_type = [
     'medium'
 ]
 
-
 # parameters of Bayesian-DQN
 learning_rate = [
     0.00025,
-    0.0004,
-    0.0005,
 ]
 
 gamma = [
-    0.99,
     0.95,
-    0.90
 ]
 
 threshold_c = [
     0.1,
+    0.2,
+    0.3,
+    0.4,
     0.5,
-    1.0
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
 ]
 
 weight_penalty = [
@@ -87,7 +90,6 @@ if not os.path.exists(folder_name):
     os.mkdir(folder_name)
 
 # run Bayesian DQN
-# 1x1x3x3x3
 model_name = 'bayes'
 q_name = 'bayes'
 count = 0
