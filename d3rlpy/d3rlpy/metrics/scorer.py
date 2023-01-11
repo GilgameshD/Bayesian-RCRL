@@ -419,15 +419,10 @@ def evaluate_on_environment(
         from d3rlpy.algos import DQN
         from d3rlpy.metrics.scorer import evaluate_on_environment
 
-
         env = gym.make('CartPole-v0')
-
         scorer = evaluate_on_environment(env)
-
         cql = CQL()
-
         mean_episode_return = scorer(cql)
-
 
     Args:
         env: gym-styled environment.
@@ -437,7 +432,6 @@ def evaluate_on_environment(
 
     Returns:
         scoerer function.
-
 
     """
 
@@ -452,7 +446,7 @@ def evaluate_on_environment(
             )
 
         episode_rewards = []
-        for _ in range(n_trials):
+        for n_t in range(n_trials):
             observation = env.reset()
             episode_reward = 0.0
 
@@ -461,6 +455,7 @@ def evaluate_on_environment(
                 stacked_observation.clear()
                 stacked_observation.append(observation)
 
+            step_num = 1
             while True:
                 # take action
                 if np.random.random() < epsilon:
@@ -482,7 +477,10 @@ def evaluate_on_environment(
 
                 if done:
                     break
+                step_num += 1
             episode_rewards.append(episode_reward)
+            print('trial: [{}/{}], step number: {}'.format(n_t+1, n_trials, step_num))
+
         return float(np.mean(episode_rewards))
 
     return scorer

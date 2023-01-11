@@ -228,7 +228,7 @@ def get_atari_transitions(
         ) from e
 
 
-def get_d4rl(env_name: str) -> Tuple[MDPDataset, gym.Env]:
+def get_d4rl(env_name: str, dataset_path: str = None) -> Tuple[MDPDataset, gym.Env]:
     """Returns d4rl dataset and envrironment.
 
     The dataset is provided through d4rl.
@@ -240,8 +240,7 @@ def get_d4rl(env_name: str) -> Tuple[MDPDataset, gym.Env]:
         dataset, env = get_d4rl('hopper-medium-v0')
 
     References:
-        * `Fu et al., D4RL: Datasets for Deep Data-Driven Reinforcement
-          Learning. <https://arxiv.org/abs/2004.07219>`_
+        * `Fu et al., D4RL: Datasets for Deep Data-Driven Reinforcement Learning. <https://arxiv.org/abs/2004.07219>`_
         * https://github.com/rail-berkeley/d4rl
 
     Args:

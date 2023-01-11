@@ -9,6 +9,8 @@ from .encoders import (
     PixelEncoderWithAction,
     VectorEncoder,
     VectorEncoderWithAction,
+    EBMEncoder,
+    ValueEncoder,
 )
 from .imitators import (
     ConditionalVAE,
@@ -69,6 +71,8 @@ __all__ = [
     "PixelEncoderWithAction",
     "VectorEncoder",
     "VectorEncoderWithAction",
+    "EBMEncoder",
+    "ValueEncoder",
     "Policy",
     "squash_action",
     "DeterministicPolicy",

@@ -1132,6 +1132,7 @@ cdef class TransitionMiniBatch:
     cdef np.ndarray _observations
     cdef np.ndarray _actions
     cdef np.ndarray _rewards
+    cdef np.ndarray _rtgs
     cdef np.ndarray _next_observations
     cdef np.ndarray _terminals
     cdef np.ndarray _n_steps
@@ -1163,14 +1164,11 @@ cdef class TransitionMiniBatch:
 
         # allocate batch data
         cdef int size = len(transitions)
-        self._observations = np.empty(
-            (size,) + observation_shape, dtype=observation_dtype
-        )
+        self._observations = np.empty((size,) + observation_shape, dtype=observation_dtype)
         self._actions = np.empty((size,) + action_shape, dtype=action_dtype)
         self._rewards = np.empty((size, 1), dtype=np.float32)
-        self._next_observations = np.empty(
-            (size,) + observation_shape, dtype=observation_dtype
-        )
+        self._rtgs = np.empty((size, 1), dtype=np.float32)
+        self._next_observations = np.empty((size,) + observation_shape, dtype=observation_dtype)
         self._terminals = np.empty((size, 1), dtype=np.float32)
         self._n_steps = np.empty((size, 1), dtype=np.float32)
 
@@ -1184,6 +1182,7 @@ cdef class TransitionMiniBatch:
         cdef void* observations_ptr = self._observations.data
         cdef void* actions_ptr = self._actions.data
         cdef FLOAT_t* rewards_ptr = <FLOAT_t*> self._rewards.data
+        cdef FLOAT_t* rtgs_ptr = <FLOAT_t*> self._rtgs.data
         cdef void* next_observations_ptr = self._next_observations.data
         cdef FLOAT_t* terminals_ptr = <FLOAT_t*> self._terminals.data
         cdef FLOAT_t* n_steps_ptr = <FLOAT_t*> self._n_steps.data
@@ -1206,6 +1205,7 @@ cdef class TransitionMiniBatch:
                 observations_ptr=observations_ptr,
                 actions_ptr=actions_ptr,
                 rewards_ptr=rewards_ptr,
+                rtgs_ptr=rtgs_ptr,
                 next_observations_ptr=next_observations_ptr,
                 terminals_ptr=terminals_ptr,
                 n_steps_ptr=n_steps_ptr,
@@ -1290,6 +1290,7 @@ cdef class TransitionMiniBatch:
         void* observations_ptr,
         void* actions_ptr,
         float* rewards_ptr,
+        float* rtgs_ptr,
         void* next_observations_ptr,
         float* terminals_ptr,
         float* n_steps_ptr,
@@ -1301,6 +1302,8 @@ cdef class TransitionMiniBatch:
     ) nogil:
         cdef int i
         cdef float n_step_return = 0.0
+        cdef float rtg = 0.0
+        cdef int max_step = 1000000
         cdef TransitionPtr next_ptr
 
         # assign data at t
@@ -1319,6 +1322,15 @@ cdef class TransitionMiniBatch:
             is_discrete=is_discrete,
         )
 
+        # compute reward-to-go with discount
+        next_ptr = ptr
+        for i in range(max_step):
+            rtg += next_ptr.get().reward * gamma ** i
+            if next_ptr.get().next_transition == nullptr:
+                break
+            next_ptr = next_ptr.get().next_transition
+        rtgs_ptr[batch_index] = rtg
+
         # compute N-step return
         next_ptr = ptr
         for i in range(n_steps):
@@ -1326,7 +1338,6 @@ cdef class TransitionMiniBatch:
             if next_ptr.get().next_transition == nullptr or i == n_steps - 1:
                 break
             next_ptr = next_ptr.get().next_transition
-
         rewards_ptr[batch_index] = n_step_return
 
         # assign data at t+N
@@ -1370,6 +1381,26 @@ cdef class TransitionMiniBatch:
 
         """
         return self._rewards
+
+    @property
+    def rtgs(self):
+        """ Returns mini-batch of reward-to-go at `t`.
+
+        Returns:
+            numpy.ndarray: reward-to-go at `t`.
+
+        """
+        return self._rtgs
+
+    @property
+    def timesteps(self):
+        """ Returns mini-batch of timesteps at `t`.
+
+        Returns:
+            numpy.ndarray: timesteps at `t`.
+
+        """
+        return self._timesteps
 
     @property
     def next_observations(self):

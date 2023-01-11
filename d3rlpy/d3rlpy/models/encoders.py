@@ -12,6 +12,8 @@ from .torch import (
     PixelEncoderWithAction,
     VectorEncoder,
     VectorEncoderWithAction,
+    EBMEncoder,
+    ValueEncoder,
 )
 
 
@@ -333,9 +335,7 @@ class DenseEncoderFactory(EncoderFactory):
     .. code-block:: python
 
        from d3rlpy.encoders import VectorEncoderFactory
-
-       factory = VectorEncoderFactory(hidden_units=[256, 256, 256, 256],
-                                      use_dense=True)
+       factory = VectorEncoderFactory(hidden_units=[256, 256, 256, 256], use_dense=True)
 
     For now, this only supports vector observations.
 
@@ -404,6 +404,72 @@ class DenseEncoderFactory(EncoderFactory):
         }
 
 
+class EBMEncoderFactory(EncoderFactory):
+    TYPE: ClassVar[str] = "ebm"
+    _hidden_units: Sequence[int]
+    _activation: str
+    _use_batch_norm: bool
+    _dropout_rate: Optional[float]
+
+    def __init__(
+        self,
+        hidden_units: Optional[Sequence[int]] = None,
+        activation: str = "relu",
+        use_batch_norm: bool = False,
+        dropout_rate: Optional[float] = None,
+    ):
+        if hidden_units is None:
+            self._hidden_units = [256, 256]
+        else:
+            self._hidden_units = hidden_units
+        self._activation = activation
+        self._use_batch_norm = use_batch_norm
+        self._dropout_rate = dropout_rate
+
+    def create_ebm(
+        self,
+        observation_shape: Sequence[int],
+        action_size: int,
+    ) -> EBMEncoder:
+        assert len(observation_shape) == 1
+        return EBMEncoder(
+            observation_shape=observation_shape,
+            action_size=action_size,
+            hidden_units=self._hidden_units,
+            use_batch_norm=self._use_batch_norm,
+            dropout_rate=self._dropout_rate,
+            activation=_create_activation(self._activation),
+        )
+
+    def create_value_network(
+        self,
+        observation_shape: Sequence[int],
+        n_quantiles: int,
+    ) -> ValueEncoder:
+        assert len(observation_shape) == 1
+        return ValueEncoder(
+            observation_shape=observation_shape,
+            n_quantiles=n_quantiles,
+            hidden_units=self._hidden_units,
+            use_batch_norm=self._use_batch_norm,
+            dropout_rate=self._dropout_rate,
+            activation=_create_activation(self._activation),
+        )
+
+    def get_params(self, deep: bool = False) -> Dict[str, Any]:
+        if deep:
+            hidden_units = copy.deepcopy(self._hidden_units)
+        else:
+            hidden_units = self._hidden_units
+        params = {
+            "hidden_units": hidden_units,
+            "activation": self._activation,
+            "use_batch_norm": self._use_batch_norm,
+            "dropout_rate": self._dropout_rate,
+        }
+        return params
+
+
 ENCODER_LIST: Dict[str, Type[EncoderFactory]] = {}
 
 
@@ -440,3 +506,4 @@ register_encoder_factory(VectorEncoderFactory)
 register_encoder_factory(PixelEncoderFactory)
 register_encoder_factory(DefaultEncoderFactory)
 register_encoder_factory(DenseEncoderFactory)
+register_encoder_factory(EBMEncoderFactory)

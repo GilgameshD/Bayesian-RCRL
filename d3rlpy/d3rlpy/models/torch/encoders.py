@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.distributions import Categorical
 
 
 class Encoder(metaclass=ABCMeta):
@@ -341,3 +342,115 @@ class VectorEncoderWithAction(_VectorEncoder, EncoderWithAction):
     @property
     def action_size(self) -> int:
         return self._action_size
+
+
+class EBMEncoder(nn.Module):
+    _action_size: int
+
+    def __init__(
+        self,
+        observation_shape: Sequence[int],
+        action_size: int,
+        hidden_units: Optional[Sequence[int]] = None,
+        use_batch_norm: bool = False,
+        dropout_rate: Optional[float] = None,
+        activation: nn.Module = nn.ReLU(),
+    ):
+        self._action_size = action_size
+        concat_shape = (observation_shape[0] + action_size,)
+        super().__init__()
+        self._observation_shape = observation_shape
+
+        # encoder for \beta(a|s) 
+        self.beta_a_c_s = _VectorEncoder(
+            observation_shape=observation_shape,
+            hidden_units=hidden_units,
+            use_batch_norm=use_batch_norm,
+            dropout_rate=dropout_rate,
+            activation=activation,
+        )
+
+        # encoder for \beta(r|s,a), use the same architecture as the last encoder
+        self.beta_r_c_s_a = _VectorEncoder(
+            observation_shape=concat_shape,
+            hidden_units=hidden_units,
+            use_batch_norm=use_batch_norm,
+            dropout_rate=dropout_rate,
+            activation=activation,
+        )
+
+    def action_branch(self, x: torch.Tensor) -> torch.Tensor:
+        # branch for \beta(a|s) 
+        h_x = self.beta_a_c_s._fc_encode(x)
+        if self.beta_a_c_s._use_batch_norm:
+            h_x = self.beta_a_c_s._bns[-1](h_x)
+        if self.beta_a_c_s._dropout_rate is not None:
+            h_x = self.beta_a_c_s._dropouts[-1](h_x)
+        return h_x
+
+    def rtg_branch(self, x: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        # branch for \beta(r|s,a)
+        x_a = torch.cat([x, action], dim=1)
+        h_x_a = self.beta_r_c_s_a._fc_encode(x_a)
+        if self.beta_r_c_s_a._use_batch_norm:
+            h_x_a = self.beta_r_c_s_a._bns[-1](h_x_a)
+        if self.beta_r_c_s_a._dropout_rate is not None:
+            h_x_a = self.beta_r_c_s_a._dropouts[-1](h_x_a)
+        return h_x_a
+
+    def forward(self, x: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        h_x = self.action_branch(x)
+        h_x_a = self.rtg_branch(x, action)
+        return h_x, h_x_a
+
+    @property
+    def action_size(self) -> int:
+        return self._action_size
+
+    def get_feature_size(self) -> int:
+        assert self.beta_a_c_s._feature_size == self.beta_r_c_s_a._feature_size, "the feature size of two encoders should be the same "
+        return self.beta_a_c_s._feature_size
+
+
+class ValueEncoder(nn.Module):
+    n_quantiles: int
+
+    def __init__(
+        self,
+        observation_shape: Sequence[int],
+        n_quantiles: int,
+        hidden_units: Optional[Sequence[int]] = None,
+        use_batch_norm: bool = False,
+        dropout_rate: Optional[float] = None,
+        activation: nn.Module = nn.ReLU(),
+    ):
+        self._n_quantiles = n_quantiles
+        super().__init__()
+        self._observation_shape = observation_shape
+
+        # encoder for p(r|s) 
+        self._encoder = _VectorEncoder(
+            observation_shape=observation_shape,
+            hidden_units=hidden_units,
+            use_batch_norm=use_batch_norm,
+            dropout_rate=dropout_rate,
+            activation=activation,
+        )
+
+        # for p(r|a,s)
+        self._rtg_c_s = nn.Linear(self.get_feature_size(), self._n_quantiles)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # branch for p(r|s)
+        h_x = self._encoder._fc_encode(x)
+        if self._encoder._use_batch_norm:
+            h_x = self._encoder._bns[-1](h_x)
+        if self._encoder._dropout_rate is not None:
+            h_x = self._encoder._dropouts[-1](h_x)
+        
+        logits = self._rtg_c_s(h_x)
+        p_r_c_s = Categorical(logits=logits)
+        return p_r_c_s
+
+    def get_feature_size(self) -> int:
+        return self._encoder._feature_size

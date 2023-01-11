@@ -18,7 +18,7 @@ from .random_policy import DiscreteRandomPolicy, RandomPolicy
 from .sac import SAC, DiscreteSAC
 from .td3 import TD3
 from .td3_plus_bc import TD3PlusBC
-from .bayesian_dqn import BayesianDiscreteDQN
+from .bayesian_dqn import BayesianDiscreteDQN, BayesianDQN, RCRL
 
 __all__ = [
     "AlgoBase",
@@ -49,6 +49,8 @@ __all__ = [
     "get_algo",
     "create_algo",
     "BayesianDiscreteDQN",
+    "BayesianDQN",
+    "RCRL",
 ]
 
 
@@ -61,7 +63,7 @@ DISCRETE_ALGORITHMS: Dict[str, Type[AlgoBase]] = {
     "nfq": NFQ,
     "sac": DiscreteSAC,
     "random": DiscreteRandomPolicy,
-    "bdqn": BayesianDiscreteDQN,
+    "bayes": BayesianDiscreteDQN,
 }
 
 CONTINUOUS_ALGORITHMS: Dict[str, Type[AlgoBase]] = {
@@ -80,6 +82,8 @@ CONTINUOUS_ALGORITHMS: Dict[str, Type[AlgoBase]] = {
     "td3": TD3,
     "td3_plus_bc": TD3PlusBC,
     "random": RandomPolicy,
+    "cbayes": BayesianDQN,
+    "rcrl": RCRL
 }
 
 

@@ -345,6 +345,7 @@ class BayesianQFunctionFactory(QFunctionFactory):
         weight_penalty: float = 0.0, 
         weight_R: float = 1.0, 
         weight_A: float = 1.0,
+        n_neg_samples: int = 64,
         **kwargs: Any
     ):
         super().__init__(share_encoder)
@@ -354,17 +355,13 @@ class BayesianQFunctionFactory(QFunctionFactory):
         self.weight_A = weight_A    # weight of loss A
         self.Vmin = Vmin
         self.Vmax = Vmax
+        self.n_neg_samples = n_neg_samples
 
-    def create_discrete(
-        self, encoder: Encoder, action_size: int
-    ) -> DiscreteBayesianQFunction:
+    def create_discrete(self, encoder: Encoder, action_size: int) -> DiscreteBayesianQFunction:
         return DiscreteBayesianQFunction(encoder, action_size, self._n_quantiles, self.Vmin, self.Vmax, self.weight_penalty, self.weight_R, self.weight_A)
 
-    def create_continuous(
-        self,
-        encoder: EncoderWithAction,
-    ) -> ContinuousBayesianQFunction:
-        return ContinuousBayesianQFunction(encoder, self._n_quantiles, self.weight_penalty, self.weight_R, self.weight_A)
+    def create_continuous(self, encoder: EncoderWithAction) -> ContinuousBayesianQFunction:
+        return ContinuousBayesianQFunction(encoder, self._n_quantiles, self.Vmin, self.Vmax, self.weight_penalty, self.weight_R, self.weight_A, self.n_neg_samples)
 
     def get_params(self, deep: bool = False) -> Dict[str, Any]:
         return {

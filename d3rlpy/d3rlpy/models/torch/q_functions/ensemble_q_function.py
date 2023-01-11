@@ -168,6 +168,18 @@ class EnsembleDiscreteQFunction(EnsembleQFunction):
 
 
 class EnsembleContinuousQFunction(EnsembleQFunction):
+    def forward_energy(self, x: torch.Tensor, action: torch.Tensor, threshold_c: int, reduction: str = "mean") -> torch.Tensor:
+        # the shape of Bayesian-DQN's Q-value is [B, A, R] rather than [B, A]
+        values = []
+        for q_func in self._q_funcs:
+            # TODO: 
+            #values.append(q_func._get_energy_with_threshold(x, action, threshold_c)[None])
+            values.append(q_func._get_energy(x, action)[None])
+        return _reduce_ensemble(torch.cat(values, dim=0), reduction)
+
+    def return_q_dist(self, x: torch.Tensor, action: torch.Tensor):
+        return self._q_funcs[0]._get_q_value_dist(x, action)
+
     def forward(
         self, x: torch.Tensor, action: torch.Tensor, reduction: str = "mean"
     ) -> torch.Tensor:
