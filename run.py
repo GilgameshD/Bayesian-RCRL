@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2023-01-11 10:52:44
+LastEditTime: 2023-01-12 16:12:10
 Description: 
 '''
 
@@ -32,17 +32,16 @@ from d3rlpy.models.encoders import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu or not')
-parser.add_argument('--stage', type=str, default='train', help='training or testing')
 
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/data/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/data/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='halfcheetah', help='[cartpole, breakout, pong, seaquest, qbert, asterix | halfcheetah, walker2d, hopper]')
+parser.add_argument('--env_name', type=str, default='walker2d', help='[cartpole, breakout, pong, seaquest, qbert, asterix | halfcheetah, walker2d, hopper]')
 parser.add_argument('--env_type', type=str, default='gym', help='atari or gym')
 
 # model selection
 parser.add_argument('--model_name', type=str, default='rcrl', help='atari - [dqn, cql, bayes, bc], gym - [cbayes, rcrl, cbc, ccql, td3bc, bcq, bear, awac]')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='medium-expert', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
@@ -107,6 +106,10 @@ elif args.env_type == 'gym':
     # dataset is small
     if args.dataset_type == 'medium-replay':
         args.n_epochs *= 4
+
+    # dataset is large
+    if args.dataset_type == 'medium-expert':
+        args.n_epochs = int(args.n_epochs/2)
 
     # set vmax accoridng to env name
     vmax_dict = {
@@ -239,8 +242,8 @@ config = {
     'is': args.inference_samples,
     'dr': args.dropout_rate,
     'bn': int(args.use_batch_norm),
-    'penalty': '',
-    'pr': '',
+    'pnl': '',
+    'newebm': '',
 }
 
 group_name = ''.join([k_i + str(config[k_i]) + '_' for k_i in config.keys()])[:-1]
@@ -262,7 +265,7 @@ def set_seed(seed):
 for t_i in range(len(seed_list)):
     # set random seed
     seed = seed_list[t_i]
-    set_seed(seed)
+    #set_seed(seed)
 
     # have to use test episode to run scores
     #train_episodes, test_episodes = train_test_split(dataset, test_size=0.0, shuffle=True)

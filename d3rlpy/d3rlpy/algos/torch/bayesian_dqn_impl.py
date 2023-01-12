@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2023-01-11 02:18:53
+LastEditTime: 2023-01-12 16:43:56
 Description: 
 '''
 
@@ -363,7 +363,7 @@ class EBM(nn.Module):
     def forward(self, x: torch.Tensor, action: torch.Tensor, rtg_t_idx: torch.Tensor) -> torch.Tensor:
         pass
 
-    def infer_energy(self, x: torch.Tensor, action: torch.Tensor, idx: int) -> torch.Tensor:
+    def infer_sum_energy(self, x: torch.Tensor, action: torch.Tensor, idx: int) -> torch.Tensor:
         beta_a_c_s = self.action_predictor(x)
         beta_r_c_s_a = self.rtg_predictor(x, action)
 
@@ -380,26 +380,24 @@ class EBM(nn.Module):
         beta_a_c_s = self.action_predictor(x)
         beta_r_c_s_a = self.rtg_predictor(x, action)
 
-        #print(beta_r_c_s_a.probs[0])
-
         # calculate energy
         energy_a = -1.0 * beta_a_c_s.log_prob(action)           # [B*(N+1), dim_a]
         energy_a = energy_a.sum(-1)                             # [B*(N+1)]
-
-        use_log_prob = True
-        if use_log_prob:
-            # use log p(R=c)
-            energy_r = -1.0 * beta_r_c_s_a.log_prob(rtg_t_idx)  # [B*(N+1)]
-        else:
-            # use log p(R>c)
-            batch_size = energy_a.shape[0]
-            index_mask = torch.arange(self._n_quantiles, device='cuda')[None]    # [1, _n_quantiles]
-            index_mask = index_mask.repeat(batch_size, 1)                        # [B*(N+1), _n_quantiles]
-            rtg_t_idx_extend = torch.clip(rtg_t_idx - 1, 0, self._n_quantiles)
-            rtg_t_idx_extend = rtg_t_idx_extend[:, None].repeat(1, self._n_quantiles)
-            index_mask = index_mask > rtg_t_idx_extend
-            energy_r = torch.sum(beta_r_c_s_a.probs * index_mask, dim=1)
+        # use log p(R=c)
+        energy_r = -1.0 * beta_r_c_s_a.log_prob(rtg_t_idx)  # [B*(N+1)]
         return energy_a, energy_r
+
+    def infer_sum_energy_no_action(self, x: torch.Tensor, action: torch.Tensor, idx: int) -> torch.Tensor:
+        beta_r_c_s_a = self.rtg_predictor(x, action)
+        # calculate energy log p(R>c|s, a)
+        prob_sum = beta_r_c_s_a.probs[:, idx:].sum(-1) # [B*(N+1)]
+        energy_r = -1.0 * torch.log(prob_sum)
+        return energy_r
+
+    def compute_energy_no_action(self, x: torch.Tensor, action: torch.Tensor, rtg_t_idx: torch.Tensor) -> torch.Tensor:
+        beta_r_c_s_a = self.rtg_predictor(x, action)
+        energy_r = -1.0 * beta_r_c_s_a.log_prob(rtg_t_idx)  # [B*(N+1)]
+        return energy_r
 
 
 class RCRLImpl(BCBaseImpl):
@@ -452,10 +450,10 @@ class RCRLImpl(BCBaseImpl):
         self._threshold_c = threshold_c
         self._inference_samples = inference_samples
 
-    def _generate_negative_targets(self, target):
-        # uniformly sample negative actions
-        size = (target.shape[0], self._n_neg_samples, self._action_size)
-        negatives = torch.zeros(size, device=self._device).uniform_(self._bounds[0], self._bounds[1])
+    def _generate_negative_targets(self, target, action_dist):
+        # use p(a|s) to sample
+        negatives = action_dist.sample((self._n_neg_samples,)).transpose(1, 0)  # [B, _n_neg_samples, dim_a]
+        negatives = negatives.clamp(min=self._bounds[0], max=self._bounds[1])   # [B, _n_neg_samples, dim_a]
 
         # Merge target and negatives: [B, N+1, D]
         targets = torch.cat([target.unsqueeze(dim=1), negatives], dim=1)
@@ -539,8 +537,12 @@ class RCRLImpl(BCBaseImpl):
         # if we dont use negative RTG, some negative samples will never be explored and will be treated as positive
         use_neg_rtg = False
 
+        # use p(a|s) as prior to sample actions
+        with torch.no_grad():
+            action_dist = self._imitator.action_predictor(obs_t)
+
         # generate negative samples
-        act_t_neg, act_t_gt = self._generate_negative_targets(act_t)  # [B, (N+1), dim_a], [B]
+        act_t_neg, act_t_gt = self._generate_negative_targets(act_t, action_dist)  # [B, (N+1), dim_a], [B]
         batch_size = act_t_neg.size(0)
         sample_size = act_t_neg.size(1)
         act_t_neg = act_t_neg.reshape(batch_size * sample_size, -1)    # [B*(N+1), dim_a]
@@ -564,19 +566,27 @@ class RCRLImpl(BCBaseImpl):
             rtg_t_aug_idx = self._convert_rtg_to_idx(rtg_t_aug)
 
         # calculate energy
-        energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
-        energy = energy_a + energy_r
-        energy = energy.reshape(batch_size, sample_size)
-
+        #energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+        #energy = energy_a + energy_r
+        energy = self._imitator.compute_energy_no_action(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+        
         # infoNCE loss with negative action
+        energy = energy.reshape(batch_size, sample_size)
         logits = -1.0 * energy
         loss_infonce = F.cross_entropy(logits, act_t_gt, reduction='mean')
+        
+        #'''
+        # loss of likelihood beta(a|s)
+        beta_a_c_s = self._imitator.action_predictor(obs_t)
+        pos_energy_a = -1.0 * beta_a_c_s.log_prob(act_t).sum(dim=1)
+        loss_action = pos_energy_a.mean(dim=0)
+        #'''
 
         # loss to enforce beta(r|s, a)
         rtg_t_pos_idx = self._convert_rtg_to_idx(rtg_t)[:, 0] # [B]
         beta_r_c_s_a = self._imitator.rtg_predictor(obs_t, act_t)
         pos_energy_r = -1.0 * beta_r_c_s_a.log_prob(rtg_t_pos_idx)
-        loss_action_value = pos_energy_r.mean(dim=0)
+        loss_rtg = pos_energy_r.mean(dim=0)
 
         '''
         # calculate loss rtg
@@ -586,7 +596,8 @@ class RCRLImpl(BCBaseImpl):
         loss_infonce = loss_infonce + loss_r
         '''
 
-        loss = self._weight_A * loss_infonce + self._weight_R * loss_action_value
+        loss = self._weight_A * (loss_infonce + loss_action) + self._weight_R * loss_rtg
+        #loss = self._weight_A * loss_infonce + self._weight_R * loss_rtg
         return loss
 
     def _predict_best_action(self, x: torch.Tensor) -> torch.Tensor:
@@ -635,9 +646,9 @@ class RCRLImpl(BCBaseImpl):
                         break
                 rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * idx
             #print(p_rtg_c_s.cpu().numpy())
-            print(idx)
+            #print(idx)
         elif rtg_from == 'fix':
-            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * (self._n_quantiles - 1)
+            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * 10
         else:
             raise ValueError('unknown rtg predictor')
 
@@ -648,10 +659,6 @@ class RCRLImpl(BCBaseImpl):
         # variables used in this step
         noise_scale = self._noise_scale
 
-        # get random actions
-        #size = (batch_size, self._inference_samples, self._action_size)
-        #actions = torch.zeros(size, device=self._device).uniform_(self._bounds[0], self._bounds[1])
-        
         # get action from prior distirbution p(a|s)
         action_dist = self._imitator.action_predictor(x)                            # [B, dim_a]
         actions = action_dist.sample((self._inference_samples,)).transpose(1, 0)    # [B, _inference_samples, dim_a]
@@ -660,8 +667,8 @@ class RCRLImpl(BCBaseImpl):
         # Derivative Free Optimizer (DFO)
         for _ in range(self._sample_iters):
             # compute energies
-            if rtg_select == 'greater':
-                energy_a, energy_r = self._imitator.infer_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), idx)
+            if rtg_select == 'greater' and rtg_from != 'fix':
+                energy_a, energy_r = self._imitator.infer_sum_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), idx)
             else:
                 energy_a, energy_r = self._imitator.compute_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), rtg_aug.reshape(new_batch_size))
             energy = energy_a + energy_r
@@ -678,8 +685,8 @@ class RCRLImpl(BCBaseImpl):
             noise_scale *= self._noise_shrink
 
         # return target with highest probability
-        if rtg_select == 'greater':
-            energy_a, energy_r = self._imitator.infer_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), idx)
+        if rtg_select == 'greater' and rtg_from != 'fix':
+            energy_a, energy_r = self._imitator.infer_sum_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), idx)
         else:
             energy_a, energy_r = self._imitator.compute_energy(x_aug.reshape(new_batch_size, -1), actions.reshape(new_batch_size, -1), rtg_aug.reshape(new_batch_size))
         energy = energy_a + energy_r
