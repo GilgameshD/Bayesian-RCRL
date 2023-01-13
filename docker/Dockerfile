@@ -24,6 +24,7 @@ RUN pip install wandb
 RUN cd ~ && git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # library path for mujoco
+RUN export MUJOCO_PY_MUJOCO_PATH=/workspace/Bayesian-DQN/.mujoco/mujoco210
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/Bayesian-DQN/.mujoco/mujoco210/bin
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
