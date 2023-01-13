@@ -30,8 +30,8 @@ RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 # install d3rlpy and d4rl
 RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e . && cd ../d4rl-atari && pip install -e .
 
-# setup wandb
+# set up wandb
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1
 
-RUN export HOME=$(pwd)
-WORKDIR $HOME
+# set up workdir
+WORKDIR $(pwd)
