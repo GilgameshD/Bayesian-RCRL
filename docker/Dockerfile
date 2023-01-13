@@ -21,17 +21,17 @@ RUN pip install matplotlib
 RUN pip install wandb
 
 # clone code
-RUN cd ~ && git clone https://github.com/GilgameshD/Bayesian-DQN.git
+RUN cd /workspace && git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # library path for mujoco
-RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/Bayesian-DQN/.mujoco/mujoco210/bin
+RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/Bayesian-DQN/.mujoco/mujoco210/bin
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
 # install d3rlpy and d4rl
-RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e . && cd ../d4rl-atari && pip install -e .
+RUN cd /workspace/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e . && cd ../d4rl-atari && pip install -e .
 
 # set up wandb
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1
 
 # set up workdir
-WORKDIR $(pwd)
+WORKDIR /workspace/Bayesian-DQN
