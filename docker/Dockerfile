@@ -8,7 +8,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install -y htop screen psmisc python3.8 python3-pip python-is-python3 git wget unzip g++ cmake 
 RUN apt-get install -y ffmpeg libsm6 libxext6 
-RUN apt-get install -y libglew-dev patchelf
+RUN apt-get install -y libglew-dev patchelf libosmesa6-dev
 
 # install python packages
 RUN pip install gym[accept-rom-license]==0.23.1
