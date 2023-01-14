@@ -24,6 +24,7 @@ RUN pip install wandb
 RUN cd ~ && git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
 # library path for mujoco
+RUN mv ~/Bayesian-DQN/.mujoco ~/.mujoco
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.mujoco/mujoco210/bin
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
@@ -34,4 +35,4 @@ RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1
 
 # set up workdir
-#WORKDIR ~/Bayesian-DQN
+#WORKDIR /home/Bayesian-DQN
