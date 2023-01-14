@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-14 14:32:36
+LastEditTime: 2023-01-14 16:55:29
 Description: 
 '''
 
@@ -48,13 +48,13 @@ dataset_type = [
     'medium-replay',
     'medium',
     'medium-expert',
+    'expert',
 ]
 
 # parameters of Bayesian-DQN
 learning_rate = [
     0.0005,
-    0.0002,
-    0.001,
+    #0.0001,
 ]
 
 hidden_dim = [
@@ -70,13 +70,12 @@ gamma = [
 threshold_c = [
     #0.05,
     0.1,
-    0.2,
+    #0.2,
 ]
 
 n_quantiles = [
     40,
-    #20,
-    #60,
+    80,
 ]
 
 sample_iters = [
@@ -85,8 +84,6 @@ sample_iters = [
 ]
 
 n_neg_samples = [
-    #64,
-    #128,
     256,
     512,
 ]
@@ -101,8 +98,8 @@ if not os.path.exists(folder_name):
     os.mkdir(folder_name)
 
 # run Bayesian DQN
-model_name = 'bayes'
-q_name = 'bayes'
+model_name = 'rcrl'
+q_name = 'none'
 count = 0
 for e_i in env_name:
     for d_i in dataset_type:
@@ -120,8 +117,8 @@ for e_i in env_name:
                                         d4rl_dataset_dir, 
                                         e_i, 
                                         d_i, 
-                                        'rcrl', 
-                                        'none', 
+                                        model_name, 
+                                        q_name, 
                                         str(lr_i), 
                                         str(h_i),
                                         str(g_i), 

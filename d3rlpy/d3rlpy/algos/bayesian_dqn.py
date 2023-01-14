@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2023-01-08 17:05:19
+LastEditTime: 2023-01-13 20:42:55
 Description: 
 '''
 
@@ -293,6 +293,7 @@ class RCRL(AlgoBase):
         weight_R: float = 1.0,
         weight_A: float = 1.0,
         n_neg_samples: int = 64,
+        use_neg_rtg: bool = False,
         use_gpu: UseGPUArg = False,
         scaler: ScalerArg = None,
         action_scaler: ActionScalerArg = None,
@@ -325,14 +326,15 @@ class RCRL(AlgoBase):
         # action sample number
         self._inference_samples = inference_samples
         self._n_neg_samples = n_neg_samples
-        
+
         # for rtg estimation
         self._n_quantiles = n_quantiles
         self._Vmin = Vmin
         self._Vmax = Vmax
         self._weight_R = weight_R
         self._weight_A = weight_A
-
+        self._use_neg_rtg = use_neg_rtg
+        
     def _create_impl(
         self, observation_shape: Sequence[int], action_size: int
     ) -> None:
@@ -355,7 +357,8 @@ class RCRL(AlgoBase):
             Vmax=self._Vmax,
             weight_R=self._weight_R,
             weight_A=self._weight_A,
-            n_neg_samples=self._n_neg_samples
+            n_neg_samples=self._n_neg_samples,
+            use_neg_rtg=self._use_neg_rtg
         )
         self._impl.build()
 

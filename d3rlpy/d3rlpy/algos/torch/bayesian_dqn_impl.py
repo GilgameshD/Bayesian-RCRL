@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2023-01-12 16:43:56
+LastEditTime: 2023-01-14 11:26:02
 Description: 
 '''
 
@@ -422,6 +422,7 @@ class RCRLImpl(BCBaseImpl):
         weight_R,
         weight_A,
         n_neg_samples,
+        use_neg_rtg,
     ):
         super().__init__(
             observation_shape=observation_shape,
@@ -449,11 +450,23 @@ class RCRLImpl(BCBaseImpl):
         self._bounds = [-1.0, 1.0]
         self._threshold_c = threshold_c
         self._inference_samples = inference_samples
+        self._use_neg_rtg = use_neg_rtg
 
     def _generate_negative_targets(self, target, action_dist):
         # use p(a|s) to sample
-        negatives = action_dist.sample((self._n_neg_samples,)).transpose(1, 0)  # [B, _n_neg_samples, dim_a]
-        negatives = negatives.clamp(min=self._bounds[0], max=self._bounds[1])   # [B, _n_neg_samples, dim_a]
+        negatives_1 = action_dist.sample((int(self._n_neg_samples/2),)).transpose(1, 0)  # [B, _n_neg_samples/2, dim_a]
+        negatives_1 = negatives_1.clamp(min=self._bounds[0], max=self._bounds[1])   # [B, _n_neg_samples/2, dim_a]
+
+        # use uniform distribution to sample
+        size = (target.shape[0], int(self._n_neg_samples/2), self._action_size)
+        negatives_2 = torch.zeros(size, device=self._device).uniform_(self._bounds[0], self._bounds[1])
+
+        # combine samples
+        negatives = torch.cat([negatives_1, negatives_2], dim=1)
+
+        #batch_mean = action_dist.mean[:, None, :]
+        #distance = torch.sum((batch_mean - negatives)**2, dim=-1) ** 0.5
+        #print(distance.sort()[0])
 
         # Merge target and negatives: [B, N+1, D]
         targets = torch.cat([target.unsqueeze(dim=1), negatives], dim=1)
@@ -534,9 +547,6 @@ class RCRLImpl(BCBaseImpl):
         # rtg_t: [B, 1]
         assert self._imitator is not None
 
-        # if we dont use negative RTG, some negative samples will never be explored and will be treated as positive
-        use_neg_rtg = False
-
         # use p(a|s) as prior to sample actions
         with torch.no_grad():
             action_dist = self._imitator.action_predictor(obs_t)
@@ -550,43 +560,44 @@ class RCRLImpl(BCBaseImpl):
         # re-organize observation and action to form a new batch
         obs_t_aug = obs_t.unsqueeze(1).repeat((1, sample_size, 1))     # [B, N+1, dim_s]
         obs_t_aug = obs_t_aug.reshape(batch_size * sample_size, -1)    # [B*(N+1), dim_s]
-
-        if use_neg_rtg:
+        
+        # if we dont use negative RTG, some negative samples will never be explored and will be treated as positive
+        if self._use_neg_rtg:
             # generate negative RTG samples
             rtg_t_aug_idx = torch.randint(0, self._n_quantiles, size=(batch_size, sample_size, 1), device=self._device)
             batch_idx = torch.arange(batch_size, device=self._device)
-            # convert continuous reward to index 
-            rtg_t_pos_idx = self._convert_rtg_to_idx(rtg_t)
+            rtg_t_pos_idx = self._convert_rtg_to_idx(rtg_t)                  # convert continuous reward to index 
             rtg_t_aug_idx[batch_idx, act_t_gt, :] = rtg_t_pos_idx            # assign true rtg to positive samples
             rtg_t_aug_idx = rtg_t_aug_idx.reshape(batch_size * sample_size)  # [B*(N+1)]
         else:
             rtg_t_aug = rtg_t.unsqueeze(1).repeat((1, sample_size, 1))       # [B, N+1, 1]
             rtg_t_aug = rtg_t_aug.reshape(batch_size * sample_size)          # [B*(N+1)]
-            # convert continuous reward to index 
-            rtg_t_aug_idx = self._convert_rtg_to_idx(rtg_t_aug)
+            rtg_t_aug_idx = self._convert_rtg_to_idx(rtg_t_aug)              # convert continuous reward to index 
 
         # calculate energy
-        #energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
-        #energy = energy_a + energy_r
-        energy = self._imitator.compute_energy_no_action(obs_t_aug, act_t_neg, rtg_t_aug_idx)
-        
+        energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+        energy = energy_a + energy_r
+        #energy = self._imitator.compute_energy_no_action(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+
         # infoNCE loss with negative action
         energy = energy.reshape(batch_size, sample_size)
         logits = -1.0 * energy
         loss_infonce = F.cross_entropy(logits, act_t_gt, reduction='mean')
-        
-        #'''
+
+        '''
         # loss of likelihood beta(a|s)
         beta_a_c_s = self._imitator.action_predictor(obs_t)
         pos_energy_a = -1.0 * beta_a_c_s.log_prob(act_t).sum(dim=1)
         loss_action = pos_energy_a.mean(dim=0)
-        #'''
+        '''
 
+        #'''
         # loss to enforce beta(r|s, a)
         rtg_t_pos_idx = self._convert_rtg_to_idx(rtg_t)[:, 0] # [B]
         beta_r_c_s_a = self._imitator.rtg_predictor(obs_t, act_t)
         pos_energy_r = -1.0 * beta_r_c_s_a.log_prob(rtg_t_pos_idx)
         loss_rtg = pos_energy_r.mean(dim=0)
+        #'''
 
         '''
         # calculate loss rtg
@@ -596,8 +607,8 @@ class RCRLImpl(BCBaseImpl):
         loss_infonce = loss_infonce + loss_r
         '''
 
-        loss = self._weight_A * (loss_infonce + loss_action) + self._weight_R * loss_rtg
-        #loss = self._weight_A * loss_infonce + self._weight_R * loss_rtg
+        #loss = self._weight_A * (loss_infonce + loss_action) + self._weight_R * loss_rtg
+        loss = self._weight_A * loss_infonce + self._weight_R * loss_rtg
         return loss
 
     def _predict_best_action(self, x: torch.Tensor) -> torch.Tensor:
@@ -648,7 +659,7 @@ class RCRLImpl(BCBaseImpl):
             #print(p_rtg_c_s.cpu().numpy())
             #print(idx)
         elif rtg_from == 'fix':
-            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * 10
+            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * 39
         else:
             raise ValueError('unknown rtg predictor')
 

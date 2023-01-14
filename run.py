@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2023-01-12 16:12:10
+LastEditTime: 2023-01-14 11:28:05
 Description: 
 '''
 
@@ -35,13 +35,13 @@ parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu or not')
 
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/data/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/data/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
-parser.add_argument('--env_name', type=str, default='walker2d', help='[cartpole, breakout, pong, seaquest, qbert, asterix | halfcheetah, walker2d, hopper]')
+parser.add_argument('--env_name', type=str, default='hopper', help='[cartpole, breakout, pong, seaquest, qbert, asterix | halfcheetah, walker2d, hopper]')
 parser.add_argument('--env_type', type=str, default='gym', help='atari or gym')
 
 # model selection
 parser.add_argument('--model_name', type=str, default='rcrl', help='atari - [dqn, cql, bayes, bc], gym - [cbayes, rcrl, cbc, ccql, td3bc, bcq, bear, awac]')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='medium', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='medium-expert', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
@@ -64,6 +64,7 @@ parser.add_argument('-esi', '--eval_step_interval', type=int, default=5000, help
 parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of online evaluation trails')
 
 # Bayesian Q parameters
+parser.add_argument('-nr', '--use_neg_rtg', type=bool, default=False, help='sample negative rtg during the training stage')
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
 parser.add_argument('-nq', '--n_quantiles', type=int, default=40, help='number of quantile of Q-value or RTG')
 parser.add_argument('-vmin', '--vmin', type=float, default=0, help='lower bound of value function or RTG')
@@ -105,7 +106,7 @@ elif args.env_type == 'gym':
 
     # dataset is small
     if args.dataset_type == 'medium-replay':
-        args.n_epochs *= 4
+        args.n_epochs *= 2
 
     # dataset is large
     if args.dataset_type == 'medium-expert':
@@ -229,7 +230,7 @@ config = {
     'nc': args.n_quantiles,
     'c': args.threshold_c,
     'lr': args.learning_rate,
-    'wp': args.weight_penalty,
+    #'wp': args.weight_penalty,
     'wR': args.weight_R,
     'wA': args.weight_A,
     'va': args.vmax,
@@ -242,8 +243,7 @@ config = {
     'is': args.inference_samples,
     'dr': args.dropout_rate,
     'bn': int(args.use_batch_norm),
-    'pnl': '',
-    'newebm': '',
+    'nr': int(args.use_neg_rtg),
 }
 
 group_name = ''.join([k_i + str(config[k_i]) + '_' for k_i in config.keys()])[:-1]
@@ -301,6 +301,7 @@ for t_i in range(len(seed_list)):
         weight_R=args.weight_R,
         weight_A=args.weight_A,
         n_neg_samples=args.n_neg_samples,
+        use_neg_rtg=args.use_neg_rtg,
         use_gpu=args.use_gpu,
     )
 
