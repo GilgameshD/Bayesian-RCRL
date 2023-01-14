@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-13 15:59:18
+LastEditTime: 2023-01-13 21:54:26
 Description: 
 '''
 
@@ -11,6 +11,7 @@ import json
 
 
 command = """ \
+    export MUJOCO_PY_MUJOCO_PATH=/home/ubuntu/4-bayesian-cql-atari/.mujoco \
     pip install -e /workspace/Bayesian-DQN/d3rlpy && \
     pip install -e /workspace/Bayesian-DQN/d4rl && \
     pip install -e /workspace/Bayesian-DQN/d4rl-atari && \
