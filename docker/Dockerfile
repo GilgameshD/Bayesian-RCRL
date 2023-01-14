@@ -11,9 +11,10 @@ RUN apt-get install -y ffmpeg libsm6 libxext6
 RUN apt-get install -y libglew-dev patchelf libosmesa6-dev
 
 # install python packages
-RUN pip install gym[accept-rom-license]==0.23.1
+#RUN pip install gym[accept-rom-license]==0.23.1
+RUN pip install gym==0.23.1
 RUN pip install Cython
-RUN pip install ale-py==0.7.5
+#RUN pip install ale-py==0.7.5
 RUN pip install torch==1.11.0
 RUN pip install numpy>=1.22
 RUN pip install tqdm
@@ -31,7 +32,8 @@ RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
 # install d3rlpy and d4rl
-RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e . && cd ../d4rl-atari && pip install -e .
+#RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e . && cd ../d4rl-atari && pip install -e .
+RUN cd ~/Bayesian-DQN/d3rlpy && pip install -e . && cd ../d4rl && pip install -e .
 
 # set up wandb
 ENV WANDB_API_KEY f77fb7919141fba6e4019f10f5cc16503cf277a1
