@@ -23,9 +23,11 @@ RUN pip install wandb
 # clone code
 RUN cd ~ && git clone https://github.com/GilgameshD/Bayesian-DQN.git
 
+# copy .mujoco folder
+RUN cp ~/Bayesian-DQN/.mujoco /root/.mujoco
+
 # library path for mujoco
-RUN mv ~/Bayesian-DQN/.mujoco ~/.mujoco
-RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/.mujoco/mujoco210/bin
+RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin
 RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
 # install d3rlpy and d4rl
