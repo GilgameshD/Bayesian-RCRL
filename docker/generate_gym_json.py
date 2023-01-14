@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-13 23:45:48
+LastEditTime: 2023-01-14 00:06:59
 Description: 
 '''
 
@@ -11,7 +11,7 @@ import json
 
 
 command = """ \
-    sudo apt-get install libosmesa6-dev && \
+    apt-get install libosmesa6-dev && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin && \
     pip install -e /workspace/Bayesian-DQN/d3rlpy && \
     pip install -e /workspace/Bayesian-DQN/d4rl && \
