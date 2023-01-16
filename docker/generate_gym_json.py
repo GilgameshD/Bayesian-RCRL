@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-15 01:08:26
+LastEditTime: 2023-01-15 21:26:37
 Description: 
 '''
 
@@ -38,9 +38,9 @@ d4rl_dataset_dir = '/workspace/data'
 
 # environment name
 env_name = [
-    'walker2d',
+    #'walker2d',
     #'halfcheetah',
-    #'hopper'
+    'hopper'
 ]
 
 # 10, 20, 30, 40, 50
