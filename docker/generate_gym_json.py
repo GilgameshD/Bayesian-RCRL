@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-15 21:26:37
+LastEditTime: 2023-01-17 20:14:20
 Description: 
 '''
 
@@ -38,8 +38,8 @@ d4rl_dataset_dir = '/workspace/data'
 
 # environment name
 env_name = [
-    #'walker2d',
-    #'halfcheetah',
+    'walker2d',
+    'halfcheetah',
     'hopper'
 ]
 
@@ -48,7 +48,7 @@ dataset_type = [
     'medium-replay',
     'medium',
     'medium-expert',
-    'expert',
+    #'expert',
 ]
 
 # parameters of Bayesian-DQN
@@ -63,29 +63,29 @@ hidden_dim = [
 ]
 
 gamma = [
-    #0.95,
+    0.95,
     0.99,
 ]
 
 threshold_c = [
-    #0.05,
-    0.1,
+    0.05,
+    #0.1,
     #0.2,
 ]
 
 n_quantiles = [
-    40,
+    #40,
     80,
 ]
 
 sample_iters = [
     5,
-    10,
+    #10,
 ]
 
 n_neg_samples = [
     256,
-    512,
+    #512,
 ]
 
 # load template json file
