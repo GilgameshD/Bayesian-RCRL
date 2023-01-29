@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-18 03:14:33
-LastEditTime: 2023-01-17 20:14:20
+LastEditTime: 2023-01-17 20:20:40
 Description: 
 '''
 
@@ -29,6 +29,11 @@ command = """ \
         --n_quantiles={} \
         --sample_iters={} \
         --n_neg_samples={} \
+        --sample_iters=5 \
+        --noise_scale=0.5 \
+        --noise_shrink=0.9 \
+        --n_trials=10 \
+        --sample_iters=5 \
 """
 
 
