@@ -76,6 +76,7 @@ class OfflineEnv(gym.Env):
                  index=None,
                  start_epoch=None,
                  step_size=1,
+                 percent_each_epoch=1,
                  last_epoch=None,
                  stack=False,
                  **kwargs):
@@ -86,6 +87,7 @@ class OfflineEnv(gym.Env):
         self.last_epoch = last_epoch
         self.step_size = step_size
         self.stack = stack
+        self.percent_each_epoch = percent_each_epoch
 
     def get_dataset(self):
         observation_stack = []
@@ -102,12 +104,19 @@ class OfflineEnv(gym.Env):
             actions = _load('action', path)
             rewards = _load('reward', path)
             terminals = _load('terminal', path)
+            
+            # only keep x% of one epoch
+            number_data = int(self.percent_each_epoch * 1000000)
+            observations = observations[0:number_data]
+            actions = actions[0:number_data]
+            rewards = rewards[0:number_data]
+            terminals = terminals[0:number_data]
 
             # sanity check
-            assert observations.shape == (1000000, 84, 84)
-            assert actions.shape == (1000000, )
-            assert rewards.shape == (1000000, )
-            assert terminals.shape == (1000000, )
+            assert observations.shape == (number_data, 84, 84)
+            assert actions.shape == (number_data, )
+            assert rewards.shape == (number_data, )
+            assert terminals.shape == (number_data, )
 
             observation_stack.append(observations)
             action_stack.append(actions)

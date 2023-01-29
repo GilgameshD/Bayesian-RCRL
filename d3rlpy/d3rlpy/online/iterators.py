@@ -247,7 +247,7 @@ def train_single_env(
 
             # psuedo epoch count
             epoch = total_step // n_steps_per_epoch
-
+            loss = None
             if total_step > update_start_step and len(buffer) > algo.batch_size:
                 if total_step % update_interval == 0:
                     # sample mini-batch
@@ -268,13 +268,15 @@ def train_single_env(
                         logger.add_metric(name, val)
 
             # call callback if given
-            if callback:
-                callback(algo, epoch, total_step)
+            if callback and loss:
+                callback(None, epoch, total_step, data_dict=loss)
 
         if epoch > 0 and total_step % n_steps_per_epoch == 0:
             # evaluation
             if eval_scorer:
-                logger.add_metric("evaluation", eval_scorer(algo))
+                #logger.add_metric("evaluation", eval_scorer(algo))
+                data_dict = {'environment': eval_scorer(algo)}
+                callback(None, epoch, total_step, data_dict=data_dict)
 
             if epoch % save_interval == 0:
                 logger.save_model(total_step, algo)

@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-08-05 19:12:08
-LastEditTime: 2023-01-14 11:28:05
+LastEditTime: 2023-01-23 21:18:06
 Description: 
 '''
 
@@ -13,7 +13,6 @@ import numpy as np
 import torch 
 import os
 import wandb
-from sklearn.model_selection import train_test_split
 
 import d3rlpy
 from d3rlpy.models.q_functions import (
@@ -32,6 +31,7 @@ from d3rlpy.models.encoders import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu or not')
+parser.add_argument('--mode', type=str, default='ablation', help='offline or online training')
 
 parser.add_argument('-wd', '--wandb_dir', type=str, default='/data/wenhao', help='directory for saving wandb metadata')
 parser.add_argument('-dd', '--d4rl_dataset_dir', type=str, default='/data/wenhao/.d4rl/datasets', help='directory for saving d4rl dataset')
@@ -41,7 +41,7 @@ parser.add_argument('--env_type', type=str, default='gym', help='atari or gym')
 # model selection
 parser.add_argument('--model_name', type=str, default='rcrl', help='atari - [dqn, cql, bayes, bc], gym - [cbayes, rcrl, cbc, ccql, td3bc, bcq, bear, awac]')
 parser.add_argument('--qf_name', type=str, default='none', help='[mean, c51, qr, iqn, fqf, bayes, none')
-parser.add_argument('-dt', '--dataset_type', type=str, default='medium-expert', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
+parser.add_argument('-dt', '--dataset_type', type=str, default='medium-replay', help='[mixed, medium, expert] - [random, medium-replay, medium, medium-expert, expert]')
 
 # beta policy model
 parser.add_argument('-bmb', '--beta_model_base', type=str, default='./model', help='directory for saving beta policy model')
@@ -66,7 +66,7 @@ parser.add_argument('-nt', '--n_trials', type=int, default=10, help='number of o
 # Bayesian Q parameters
 parser.add_argument('-nr', '--use_neg_rtg', type=bool, default=False, help='sample negative rtg during the training stage')
 parser.add_argument('-c', '--threshold_c', type=float, default=0.1, help='condition threshold used in testing')
-parser.add_argument('-nq', '--n_quantiles', type=int, default=40, help='number of quantile of Q-value or RTG')
+parser.add_argument('-nq', '--n_quantiles', type=int, default=80, help='number of quantile of Q-value or RTG')
 parser.add_argument('-vmin', '--vmin', type=float, default=0, help='lower bound of value function or RTG')
 parser.add_argument('-vmax', '--vmax', type=float, default=400, help='upper bound of value function or RTG (depends on gamma, 0.99 - 400, 0.95 - 100)')
 parser.add_argument('-ga', '--gamma', type=float, default=0.99, help='reward discount')
@@ -78,8 +78,8 @@ parser.add_argument('-ns', '--n_steps', type=int, default=1, help='number of ste
 
 # Energy-based model
 parser.add_argument('-si', '--sample_iters', type=int, default=5, help='number of iteration')
-parser.add_argument('-nsc', '--noise_scale', type=float, default=0.33, help='scale of noise')
-parser.add_argument('-nsh', '--noise_shrink', type=float, default=0.5, help='shrink of noise')
+parser.add_argument('-nsc', '--noise_scale', type=float, default=0.5, help='scale of noise')
+parser.add_argument('-nsh', '--noise_shrink', type=float, default=0.9, help='shrink of noise')
 parser.add_argument('-is', '--inference_samples', type=int, default=2**16, help='number of testing samples for action')
 parser.add_argument('-nss', '--n_neg_samples', type=int, default=256, help='number of negative samples used for infoNCE')
 
@@ -89,7 +89,13 @@ args = parser.parse_args()
 
 
 # process some parameters
-project = 'bayesian-'+args.env_name+'-sweep'
+if args.mode == 'online':
+    project = 'bayesian-'+args.env_name+'-sweep-online'
+elif args.mode == 'ablation':
+    project = 'bayesian-'+args.env_name+'-sweep-ablation'
+else:
+    project = 'bayesian-'+args.env_name+'-sweep'
+
 beta_model_dir = os.path.join(args.beta_model_base, args.env_name, args.dataset_type)
 os.environ['D4RL_DATASET_DIR'] = args.d4rl_dataset_dir
 os.environ['D4RL_SUPPRESS_IMPORT_ERROR'] = '1'
@@ -100,13 +106,14 @@ if args.env_type == 'atari':
     n_frames = 4
 elif args.env_type == 'gym':
     dataset, env = d3rlpy.datasets.get_d4rl(args.env_name+'-'+args.dataset_type+'-v2', args.d4rl_dataset_dir)
-    scaler = 'standard'
+    scaler = 'standard' if args.mode == 'offline' else None
     n_frames = 1
     hidden_units = [args.hidden_dim for _ in range(args.hidden_num)]
 
     # dataset is small
     if args.dataset_type == 'medium-replay':
-        args.n_epochs *= 2
+        #args.n_epochs *= 2
+        args.eval_step_interval = 1000
 
     # dataset is large
     if args.dataset_type == 'medium-expert':
@@ -215,36 +222,49 @@ q_func = qf_list[args.qf_name]
 
 # select evaluation metrics
 scorers = {'environment': d3rlpy.metrics.evaluate_on_environment(env, n_trials=args.n_trials, epsilon=args.test_epsilon)}
-if args.model_name in ['bc']:
-    scorers.update({'action_match': d3rlpy.metrics.scorer.discrete_action_match_scorer})
-elif args.model_name in ['cbc']:
-    scorers.update({'action_match': d3rlpy.metrics.scorer.continuous_action_diff_scorer})
-elif args.model_name in ['dqn', 'cql']:
-    scorers.update({'td_error': d3rlpy.metrics.td_error_scorer})
-else:
-    pass
+
 
 # set up wandb
-config = {
-    '': args.model_name + '_' + args.dataset_type,
-    'nc': args.n_quantiles,
-    'c': args.threshold_c,
-    'lr': args.learning_rate,
-    #'wp': args.weight_penalty,
-    'wR': args.weight_R,
-    'wA': args.weight_A,
-    'va': args.vmax,
-    'si': args.sample_iters,
-    'nsc': args.noise_scale,
-    'nsh': args.noise_shrink,
-    'nss': args.n_neg_samples,
-    'hd': args.hidden_dim,
-    'hn': args.hidden_num,
-    'is': args.inference_samples,
-    'dr': args.dropout_rate,
-    'bn': int(args.use_batch_norm),
-    'nr': int(args.use_neg_rtg),
-}
+if args.env_type == 'gym':
+    config = {
+        '': args.model_name + '_' + args.dataset_type,
+        'nc': args.n_quantiles,
+        'c': args.threshold_c,
+        'lr': args.learning_rate,
+        #'wp': args.weight_penalty,
+        'wR': args.weight_R,
+        'wA': args.weight_A,
+        'va': args.vmax,
+        'si': args.sample_iters,
+        'nsc': args.noise_scale,
+        'nsh': args.noise_shrink,
+        'nss': args.n_neg_samples,
+        'hd': args.hidden_dim,
+        'hn': args.hidden_num,
+        'is': args.inference_samples,
+        'dr': args.dropout_rate,
+        'bn': int(args.use_batch_norm),
+        'nr': int(args.use_neg_rtg),
+        'test': '1'
+    }
+else:
+    config = {
+        '': args.model_name + '_' + args.qf_name + '_' + args.dataset_type,
+        'nc': args.n_quantiles,
+        'c': args.threshold_c,
+        'ne': args.n_epochs,
+        'te': args.test_epsilon,
+        'blr': args.beta_learning_rate,
+        'bs': args.batch_size,
+        'lr': args.learning_rate,
+        'bwp': args.beta_weight_penalty,
+        'wp': args.weight_penalty,
+        'tui': args.target_update_interval,
+        'ga': args.gamma,
+        'wR': args.weight_R,
+        'wA': args.weight_A,
+        'va': args.vmax,
+    }
 
 group_name = ''.join([k_i + str(config[k_i]) + '_' for k_i in config.keys()])[:-1]
 def wandb_callback(algo, epoch, total_step, data_dict):
@@ -254,6 +274,7 @@ def wandb_callback(algo, epoch, total_step, data_dict):
 
 # set up random seeds
 seed_list = [111, 222, 333, 444, 555, 666, 777, 888, 999, 123]
+#seed_list = [111, 222, 333, 444, 555]
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -266,9 +287,6 @@ for t_i in range(len(seed_list)):
     # set random seed
     seed = seed_list[t_i]
     #set_seed(seed)
-
-    # have to use test episode to run scores
-    #train_episodes, test_episodes = train_test_split(dataset, test_size=0.0, shuffle=True)
 
     # init wandb
     name = group_name + '_seed' + str(seed)
@@ -313,15 +331,34 @@ for t_i in range(len(seed_list)):
             n_epochs=args.beta_epoch,
         )
 
-    # fit model
-    model.fit(
-        dataset=dataset,
-        #eval_episodes=test_episodes,
-        n_epochs=args.n_epochs,
-        scorers=scorers,
-        callback=wandb_callback,
-        verbose=False,
-        save_metrics=False,
-        eval_step_interval=args.eval_step_interval,
-    )
+    if args.mode in ['offline', 'ablation']:
+        # fit model
+        model.fit(
+            dataset=dataset,
+            n_epochs=args.n_epochs,
+            scorers=scorers,
+            callback=wandb_callback,
+            verbose=False,
+            save_metrics=False,
+            eval_step_interval=args.eval_step_interval,
+        )
+    elif args.mode == 'online':
+        # fit model online
+        buffer = d3rlpy.online.buffers.ReplayBuffer(maxlen=10000, env=env)
+        n_steps = 100000
+        model.fit_online(
+            env,
+            buffer,
+            callback=wandb_callback,
+            eval_env=env,
+            verbose=False,
+            save_metrics=False,
+            update_interval=10,
+            n_steps=n_steps,
+            n_steps_per_epoch=args.eval_step_interval, # only used for evaluation
+            update_start_step=args.batch_size,
+        )
+    else:
+        raise ValueError('unknown training mode')
+
     run.finish()

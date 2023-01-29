@@ -446,6 +446,9 @@ def evaluate_on_environment(
             )
 
         episode_rewards = []
+        reward_list = []
+        index_list = []
+        timestep_list = []
         for n_t in range(n_trials):
             observation = env.reset()
             episode_reward = 0.0
@@ -464,10 +467,17 @@ def evaluate_on_environment(
                     if is_image:
                         action = algo.predict([stacked_observation.eval()])[0]
                     else:
-                        action = algo.predict([observation])[0]
+                        #action = algo.predict([observation])[0]
+
+                        # NOTE: for plotting observed reward
+                        action, index = algo.predict([observation])
+                        action = action[0]
 
                 observation, reward, done, _ = env.step(action)
                 episode_reward += reward
+                reward_list.append(reward)
+                index_list.append(index)
+                timestep_list.append(step_num)
 
                 if is_image:
                     stacked_observation.append(observation)
@@ -479,8 +489,18 @@ def evaluate_on_environment(
                     break
                 step_num += 1
             episode_rewards.append(episode_reward)
-            print('trial: [{}/{}], step number: {}'.format(n_t+1, n_trials, step_num))
+            print('trial: [{}/{}], step number: {}, episode reward: {}'.format(n_t+1, n_trials, step_num, episode_reward))
 
+        def discount_cumsum(x, gamma):
+            discount_cumsum = np.zeros_like(x)
+            discount_cumsum[-1] = x[-1]
+            for t in reversed(range(x.shape[0]-1)):
+                discount_cumsum[t] = x[t] + gamma * discount_cumsum[t+1]
+            return discount_cumsum
+
+        # calculate rtg
+        #rtg_list = discount_cumsum(np.array(reward_list), 0.99)
+        #np.save('./exp_results/observed_reward_walker_e_80_c005.npy', {'reward': reward_list, 'rtg': rtg_list, 'index': index_list, 'timestep': timestep_list}, allow_pickle=True)
         return float(np.mean(episode_rewards))
 
     return scorer

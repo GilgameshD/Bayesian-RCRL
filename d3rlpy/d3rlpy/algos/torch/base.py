@@ -55,13 +55,13 @@ class TorchImplBase(AlgoImplBase):
         assert x.ndim > 1, "Input must have batch dimension."
 
         with torch.no_grad():
-            action = self._predict_best_action(x)
+            action, index = self._predict_best_action(x)
 
             # transform action back to the original range
             if self._action_scaler:
                 action = self._action_scaler.reverse_transform(action)
 
-            return action.cpu().detach().numpy()
+            return action.cpu().detach().numpy(), index
 
     def _predict_best_action(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError

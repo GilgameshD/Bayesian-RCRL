@@ -2,7 +2,7 @@
 Author: Wenhao Ding
 Email: wenhaod@andrew.cmu.edu
 Date: 2022-09-07 14:24:44
-LastEditTime: 2023-01-14 11:26:02
+LastEditTime: 2023-01-21 16:40:57
 Description: 
 '''
 
@@ -13,7 +13,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal, Categorical
+from torch.distributions import Normal, Categorical, MixtureSameFamily, Independent
 from torch.optim import Adam
 
 from ...gpu import Device
@@ -325,12 +325,14 @@ class EBM(nn.Module):
         n_quantiles: int,
         min_logstd: float = -4.0,
         max_logstd: float = 15.0,
+        use_gmm: bool = False,
     ):
         super().__init__()
 
         self._n_quantiles = n_quantiles
         self._min_logstd = min_logstd
         self._max_logstd = max_logstd
+        self._action_size = action_size
         self._encoder = encoder
 
         # for p(a|s)
@@ -342,6 +344,24 @@ class EBM(nn.Module):
 
         # for p(r|s)
         self._rtg_c_s = nn.Linear(encoder.get_feature_size(), n_quantiles)
+
+        if use_gmm:
+            self.K = 2
+            self._weight = nn.Linear(encoder.get_feature_size(), self.K)
+            self._mu = nn.Linear(encoder.get_feature_size(), action_size * self.K)
+            self._logstd = nn.Linear(encoder.get_feature_size(), action_size * self.K)
+            self.action_predictor = self.action_gmm_predictor
+
+    def action_gmm_predictor(self, x: torch.Tensor) -> Normal:
+        h_x = self._encoder.action_branch(x)
+        w_s = self._weight(h_x)                                           # [B, K]        
+        mu_s = self._mu(h_x).view(-1, self.K, self._action_size)          # [B, K, dim_a]
+        logstd_s = self._logstd(h_x).view(-1, self.K, self._action_size)  # [B, K, dim_a]
+        clipped_logstd = logstd_s.clamp(self._min_logstd, self._max_logstd)
+        mix = Categorical(logits=w_s)
+        print(mix.probs[0])
+        comp = Independent(Normal(mu_s, clipped_logstd.exp()), 1)
+        return MixtureSameFamily(mix, comp)
 
     def action_predictor(self, x: torch.Tensor) -> Normal:
         h_x = self._encoder.action_branch(x)
@@ -452,14 +472,19 @@ class RCRLImpl(BCBaseImpl):
         self._inference_samples = inference_samples
         self._use_neg_rtg = use_neg_rtg
 
+        self._use_gmm = False
+
     def _generate_negative_targets(self, target, action_dist):
         # use p(a|s) to sample
         negatives_1 = action_dist.sample((int(self._n_neg_samples/2),)).transpose(1, 0)  # [B, _n_neg_samples/2, dim_a]
-        negatives_1 = negatives_1.clamp(min=self._bounds[0], max=self._bounds[1])   # [B, _n_neg_samples/2, dim_a]
+        negatives_1 = negatives_1.clamp(min=self._bounds[0], max=self._bounds[1])        # [B, _n_neg_samples/2, dim_a]
 
         # use uniform distribution to sample
         size = (target.shape[0], int(self._n_neg_samples/2), self._action_size)
         negatives_2 = torch.zeros(size, device=self._device).uniform_(self._bounds[0], self._bounds[1])
+
+        #negatives_2 = action_dist.sample((int(self._n_neg_samples/2),)).transpose(1, 0)  # [B, _n_neg_samples/2, dim_a]
+        #negatives_2 = negatives_2.clamp(min=self._bounds[0], max=self._bounds[1])        # [B, _n_neg_samples/2, dim_a]
 
         # combine samples
         negatives = torch.cat([negatives_1, negatives_2], dim=1)
@@ -506,7 +531,7 @@ class RCRLImpl(BCBaseImpl):
         encoder = self._encoder_factory.create_ebm(self._observation_shape, self._action_size)
 
         # build energy model
-        self._imitator = EBM(encoder, self._action_size, self._n_quantiles)
+        self._imitator = EBM(encoder, self._action_size, self._n_quantiles, use_gmm=self._use_gmm)
 
         # build value network
         self._value_network = self._encoder_factory.create_value_network(self._observation_shape, self._n_quantiles)
@@ -574,22 +599,19 @@ class RCRLImpl(BCBaseImpl):
             rtg_t_aug = rtg_t_aug.reshape(batch_size * sample_size)          # [B*(N+1)]
             rtg_t_aug_idx = self._convert_rtg_to_idx(rtg_t_aug)              # convert continuous reward to index 
 
+        no_action_energy = False
+
         # calculate energy
-        energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
-        energy = energy_a + energy_r
-        #energy = self._imitator.compute_energy_no_action(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+        if no_action_energy:
+            energy = self._imitator.compute_energy_no_action(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+        else:
+            energy_a, energy_r = self._imitator.compute_energy(obs_t_aug, act_t_neg, rtg_t_aug_idx)
+            energy = energy_a + energy_r
 
         # infoNCE loss with negative action
         energy = energy.reshape(batch_size, sample_size)
         logits = -1.0 * energy
         loss_infonce = F.cross_entropy(logits, act_t_gt, reduction='mean')
-
-        '''
-        # loss of likelihood beta(a|s)
-        beta_a_c_s = self._imitator.action_predictor(obs_t)
-        pos_energy_a = -1.0 * beta_a_c_s.log_prob(act_t).sum(dim=1)
-        loss_action = pos_energy_a.mean(dim=0)
-        '''
 
         #'''
         # loss to enforce beta(r|s, a)
@@ -607,8 +629,14 @@ class RCRLImpl(BCBaseImpl):
         loss_infonce = loss_infonce + loss_r
         '''
 
-        #loss = self._weight_A * (loss_infonce + loss_action) + self._weight_R * loss_rtg
-        loss = self._weight_A * loss_infonce + self._weight_R * loss_rtg
+        if no_action_energy:
+            # loss of likelihood beta(a|s)
+            beta_a_c_s = self._imitator.action_predictor(obs_t)
+            pos_energy_a = -1.0 * beta_a_c_s.log_prob(act_t).sum(dim=1)
+            loss_action = pos_energy_a.mean(dim=0)
+            loss = self._weight_A * (loss_infonce + loss_action) + self._weight_R * loss_rtg
+        else:
+            loss = self._weight_A * loss_infonce + self._weight_R * loss_rtg
         return loss
 
     def _predict_best_action(self, x: torch.Tensor) -> torch.Tensor:
@@ -622,7 +650,7 @@ class RCRLImpl(BCBaseImpl):
         if rtg_from in ['action', 'state']:
             if rtg_from == 'action':
                 # calculate the threshold for rtg, use p(a|s) as prior instead of uniform samples
-                num_action = 1000
+                num_action = 500
                 x_aug = x.unsqueeze(1).repeat(1, num_action, 1)                # [B, num_action, dim_s]
 
                 action_dist = self._imitator.action_predictor(x)               # [B, dim_a]
@@ -659,7 +687,7 @@ class RCRLImpl(BCBaseImpl):
             #print(p_rtg_c_s.cpu().numpy())
             #print(idx)
         elif rtg_from == 'fix':
-            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * 39
+            rtg_aug = torch.ones((batch_size, self._inference_samples, 1), device=self._device) * (self._n_quantiles - 1)
         else:
             raise ValueError('unknown rtg predictor')
 
@@ -670,7 +698,7 @@ class RCRLImpl(BCBaseImpl):
         # variables used in this step
         noise_scale = self._noise_scale
 
-        # get action from prior distirbution p(a|s)
+        # initialize action from prior distirbution p(a|s)
         action_dist = self._imitator.action_predictor(x)                            # [B, dim_a]
         actions = action_dist.sample((self._inference_samples,)).transpose(1, 0)    # [B, _inference_samples, dim_a]
         actions = actions.clamp(min=self._bounds[0], max=self._bounds[1])
@@ -704,4 +732,7 @@ class RCRLImpl(BCBaseImpl):
         probs = torch.softmax(-1.0 * energy.reshape(batch_size, self._inference_samples), dim=-1)
         best_idxs = probs.argmax(dim=-1)
         action = actions[torch.arange(actions.size(0), device=self._device), best_idxs, :]
-        return action
+        return action, idx
+
+    def _sample_action(self, x: torch.Tensor) -> torch.Tensor:
+        return self._predict_best_action(x)
